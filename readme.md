@@ -30,13 +30,18 @@ Edit `config.py` with your:
 3. **Run the Bot**
 
 ```bash
+# Create and activate a virtual environment (optional)
+python -m venv venv
+venv\Scripts\activate
+
+# Run the bot
 python main.py
 ```
 
 ## Project Structure
 
 ```
-discord_bot_template/
+discord-bot/
 ├── main.py           # Main bot entry point
 ├── config.py         # Bot configuration
 ├── utils.py          # Utility functions and decorators
@@ -44,6 +49,8 @@ discord_bot_template/
 │   ├── commands.py   # Regular command cog
 │   ├── slash.py      # Slash command cog
 │   └── ...           # Add more cogs as needed
+├── requirements.txt  # Python package requirements
+├── .gitignore        # Git ignore file
 └── README.md         # Documentation
 ```
 
