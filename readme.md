@@ -122,3 +122,7 @@ This template is available for free use.
 ## Extending
 
 This template is designed for easy extension. Add new cogs, commands, and features as needed for your specific bot use case.
+
+<div align="center">
+  Just for Fun!
+</div>
