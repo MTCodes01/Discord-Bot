@@ -19,8 +19,12 @@ intents.messages = True
 intents.message_content = True
 intents.guilds = True
 intents.members = True
+intents.presences = True  # For member status updates
+# Enable all intents for complete access
+intents = discord.Intents.all()
 
-bot = commands.Bot(command_prefix=config.PREFIX, intents=intents)
+# Disable the default help command
+bot = commands.Bot(command_prefix=config.PREFIX, intents=intents, help_command=None)
 
 # Bot events
 @bot.event
@@ -40,6 +44,16 @@ async def on_ready():
         logger.info(f"Synced {len(synced)} application commands")
     except Exception as e:
         logger.error(f"Failed to sync application commands: {e}")
+    
+    # Set bot status to online with custom activity
+    try:
+        await bot.change_presence(
+            status=discord.Status.online,
+            activity=discord.Game(name=config.BOT_STATUS)
+        )
+        logger.info(f"Bot status set to: {config.BOT_STATUS}")
+    except Exception as e:
+        logger.error(f"Failed to set presence: {e}")
 
 @bot.event
 async def on_command_error(ctx, error):

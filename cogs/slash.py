@@ -11,6 +11,17 @@ class SlashCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.commands_cog = None
+        
+        # Register the slash commands with the bot's command tree
+        self._add_commands_to_tree()
+    
+    def _add_commands_to_tree(self):
+        """Manually register all commands with the bot's app_commands tree."""
+        self.bot.tree.add_command(self.slash_shutdown)
+        self.bot.tree.add_command(self.slash_reboot)
+        self.bot.tree.add_command(self.slash_help)
+        self.bot.tree.add_command(self.slash_mod_command)
+        self.bot.tree.add_command(self.slash_ping)
     
     async def cog_load(self):
         """Get reference to the Commands cog for command reuse."""

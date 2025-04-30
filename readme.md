@@ -119,8 +119,8 @@ The bot will automatically load all cogs in the `cogs` directory on startup.
 
 The help system is automatically populated from command decorators, separating commands by permission level:
 
-- `!help` - Shows all commands available to the user
-- `!help command_name` - Shows detailed help for a specific command
+- `>help` - Shows all commands available to the user
+- `>help command_name` - Shows detailed help for a specific command
 
 ## License
 
