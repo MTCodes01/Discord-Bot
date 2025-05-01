@@ -13,3 +13,9 @@ env/
 
 # Bot logs
 *.log
+
+# Config & DB files
+*.json
+*.db
+*.sqlite3
+*.sqlite

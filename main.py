@@ -15,16 +15,22 @@ logger = logging.getLogger("bot")
 
 # Bot initialization
 intents = discord.Intents.default()
-intents.messages = True
-intents.message_content = True
-intents.guilds = True
-intents.members = True
-intents.presences = True  # For member status updates
-# Enable all intents for complete access
+intents.message_content = True  # To read message content for automod
+intents.guilds = True           # For guild events
+intents.members = True          # For member join/leave events
+intents.presences = True        # For member status
+intents.messages = True         # For message events
+intents.guild_messages = True   # For message logging
+intents.guild_reactions = True  # For reaction events
+intents.guild_typing = True     # For typing events
+intents.emojis_and_stickers = True  # For server backup
+intents.voice_states = True     # For voice activity tracking
+intents.bans = True             # For ban logging
 intents = discord.Intents.all()
 
 # Disable the default help command
 bot = commands.Bot(command_prefix=config.PREFIX, intents=intents, help_command=None)
+bot.logger = logger  # Add logger to bot for access in cogs
 
 # Bot events
 @bot.event

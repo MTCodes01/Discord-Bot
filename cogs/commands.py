@@ -5,6 +5,213 @@ import sys
 import asyncio
 from utils import owner_only, mod_only, command_help, HelpInfo, create_embed
 
+class HelpView(discord.ui.View):
+    """Interactive help menu with pagination and category filtering"""
+    
+    def __init__(self, ctx, commands_by_category, timeout=120):
+        super().__init__(timeout=timeout)
+        self.ctx = ctx
+        self.commands_by_category = commands_by_category
+        self.current_page = 0
+        self.current_category = "all"  # Default to show all categories
+        self.items_per_page = 20
+        
+        # Setup the category select dropdown
+        self.category_select = self.create_category_select()
+        self.add_item(self.category_select)
+        
+        # Setup the navigation buttons
+        self.previous_button = discord.ui.Button(
+            style=discord.ButtonStyle.secondary,
+            label="Previous",
+            emoji="◀️",
+            disabled=True
+        )
+        self.previous_button.callback = self.on_previous
+        self.add_item(self.previous_button)
+        
+        self.next_button = discord.ui.Button(
+            style=discord.ButtonStyle.secondary,
+            label="Next",
+            emoji="▶️",
+            disabled=self.get_total_pages() <= 1
+        )
+        self.next_button.callback = self.on_next
+        self.add_item(self.next_button)
+        
+    def create_category_select(self):
+        """Create the category selection dropdown"""
+        # Create options based on available categories
+        options = [discord.SelectOption(label="All Commands", value="all", emoji="📋", default=True)]
+        
+        # Add owner commands if user is owner
+        if self.ctx.author.id == config.OWNER_ID and self.commands_by_category["owner"]:
+            options.append(discord.SelectOption(label="Owner Commands", value="owner", emoji="🔒"))
+            
+        # Add mod commands if user is mod or owner
+        is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
+        if (is_mod or self.ctx.author.id == config.OWNER_ID) and self.commands_by_category["mod"]:
+            options.append(discord.SelectOption(label="Moderator Commands", value="mod", emoji="🛡️"))
+            
+        # Add general commands option
+        if self.commands_by_category["general"]:
+            options.append(discord.SelectOption(label="General Commands", value="general", emoji="📝"))
+            
+        # Create the select menu
+        select = discord.ui.Select(
+            placeholder="Select command category",
+            options=options
+        )
+        select.callback = self.on_category_select
+        return select
+        
+    async def on_category_select(self, interaction):
+        """Handle category selection"""
+        self.current_category = interaction.data["values"][0]
+        self.current_page = 0  # Reset to first page when changing category
+        
+        # Update button states
+        await self.update_view(interaction)
+    
+    async def on_previous(self, interaction):
+        """Handle previous page button"""
+        self.current_page -= 1
+        await self.update_view(interaction)
+    
+    async def on_next(self, interaction):
+        """Handle next page button"""
+        self.current_page += 1
+        await self.update_view(interaction)
+    
+    async def update_view(self, interaction):
+        """Update the view and embed"""
+        # Update button states
+        self.previous_button.disabled = (self.current_page == 0)
+        self.next_button.disabled = (self.current_page >= self.get_total_pages() - 1)
+        
+        # Update the message
+        await interaction.response.edit_message(embed=self.get_embed(), view=self)
+    
+    def get_total_pages(self):
+        """Calculate the total number of pages for the current category"""
+        commands_list = self.get_visible_commands()
+        return max(1, (len(commands_list) + self.items_per_page - 1) // self.items_per_page)
+    
+    def get_visible_commands(self):
+        """Get list of commands visible to the user based on selected category"""
+        if self.current_category == "all":
+            # Combine all accessible categories
+            visible_commands = []
+            
+            # Add owner commands if user is owner
+            if self.ctx.author.id == config.OWNER_ID:
+                visible_commands.extend(self.commands_by_category.get("owner", []))
+                
+            # Add mod commands if user is mod or owner
+            is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
+            if is_mod or self.ctx.author.id == config.OWNER_ID:
+                visible_commands.extend(self.commands_by_category.get("mod", []))
+                
+            # Add general commands (accessible to everyone)
+            visible_commands.extend(self.commands_by_category.get("general", []))
+            
+            return visible_commands
+        else:
+            # Return only the selected category if the user has permission to view it
+            category = self.current_category
+            
+            if category == "owner" and self.ctx.author.id != config.OWNER_ID:
+                return []
+                
+            if category == "mod":
+                is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
+                if not is_mod and self.ctx.author.id != config.OWNER_ID:
+                    return []
+                    
+            return self.commands_by_category.get(category, [])
+    
+    def get_embed(self):
+        """Generate the help embed for the current page and category"""
+        if self.current_category == "all":
+            title = "Bot Commands Help"
+        elif self.current_category == "owner":
+            title = "🔒 Owner Commands"
+        elif self.current_category == "mod":
+            title = "🛡️ Moderator Commands"
+        else:
+            title = "📝 General Commands"
+            
+        embed = create_embed(title)
+        
+        # Get the commands for this category and page
+        commands_list = self.get_visible_commands()
+        
+        # Calculate pagination
+        start_idx = self.current_page * self.items_per_page
+        end_idx = min(start_idx + self.items_per_page, len(commands_list))
+        
+        # Generate command list text
+        if not commands_list:
+            embed.description = "No commands available in this category."
+        else:
+            page_commands = commands_list[start_idx:end_idx]
+            
+            # If showing all categories, group by category
+            if self.current_category == "all":
+                # Group commands by category
+                by_category = {"owner": [], "mod": [], "general": []}
+                
+                for cmd in page_commands:
+                    for cat in ["owner", "mod", "general"]:
+                        if cmd in self.commands_by_category.get(cat, []):
+                            by_category[cat].append(cmd)
+                            break
+                
+                # Add owner commands field if any
+                if by_category["owner"] and self.ctx.author.id == config.OWNER_ID:
+                    owner_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
+                                          for cmd in by_category["owner"]])
+                    embed.add_field(name="🔒 Owner Commands", value=owner_text, inline=False)
+                    
+                # Add mod commands field if any
+                if by_category["mod"]:
+                    mod_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
+                                        for cmd in by_category["mod"]])
+                    embed.add_field(name="🛡️ Moderator Commands", value=mod_text, inline=False)
+                    
+                # Add general commands field if any
+                if by_category["general"]:
+                    general_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
+                                            for cmd in by_category["general"]])
+                    embed.add_field(name="📝 General Commands", value=general_text, inline=False)
+            else:
+                # Just show the commands from the selected category
+                commands_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
+                                         for cmd in page_commands])
+                embed.description = commands_text
+        
+        # Add pagination info to footer
+        total_pages = self.get_total_pages()
+        total_commands = len(commands_list)
+        
+        if total_commands > 0:
+            pagination_info = f"Page {self.current_page + 1}/{total_pages} • "
+            pagination_info += f"Showing {min(self.items_per_page, end_idx - start_idx)} of {total_commands} commands"
+        else:
+            pagination_info = "No commands to display"
+            
+        embed.set_footer(text=f"{pagination_info} • Use {config.PREFIX}help [command] for details")
+        
+        return embed
+        
+    async def interaction_check(self, interaction):
+        """Ensure only the user who initiated the help command can use the components"""
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("You can't use this menu. Please run your own help command.", ephemeral=True)
+            return False
+        return True
+
+
 class Commands(commands.Cog):
     """Main commands for the bot."""
     
@@ -63,32 +270,14 @@ class Commands(commands.Cog):
             else:
                 await ctx.send(f"Command '{command_name}' not found.")
         else:
-            # Show all commands
-            embed = create_embed("Bot Commands Help")
-            
+            # Show all commands with pagination and category selection
             commands_by_category = HelpInfo.get_all_commands()
             
-            # Owner commands (only show to owner)
-            if ctx.author.id == config.OWNER_ID and commands_by_category["owner"]:
-                owner_cmds = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}" 
-                                       for cmd in commands_by_category["owner"]])
-                embed.add_field(name="🔒 Owner Commands", value=owner_cmds or "None", inline=False)
+            # Create the paginated help view
+            view = HelpView(ctx, commands_by_category)
             
-            # Mod commands (only show to mods and owner)
-            is_mod = any(role.id in config.MOD_ROLES for role in ctx.author.roles) if ctx.guild else False
-            if (is_mod or ctx.author.id == config.OWNER_ID) and commands_by_category["mod"]:
-                mod_cmds = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}" 
-                                     for cmd in commands_by_category["mod"]])
-                embed.add_field(name="🛡️ Moderator Commands", value=mod_cmds or "None", inline=False)
-            
-            # General commands (show to everyone)
-            if commands_by_category["general"]:
-                general_cmds = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}" 
-                                         for cmd in commands_by_category["general"]])
-                embed.add_field(name="📝 General Commands", value=general_cmds or "None", inline=False)
-            
-            embed.set_footer(text=f"Use {config.PREFIX}help [command] for detailed info about a command.")
-            await ctx.send(embed=embed)
+            # Send the initial embed with the view
+            await ctx.send(embed=view.get_embed(), view=view)
     
     # Example commands
     @commands.command()

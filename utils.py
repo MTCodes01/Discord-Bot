@@ -31,12 +31,14 @@ class HelpInfo:
     }
     
     @classmethod
-    def add_command(cls, category, name, description, usage=None):
+    def add_command(cls, category, name, description, usage=None, examples=None, note=None):
         """Register a command's help information."""
         cls._commands[category].append({
             "name": name,
             "description": description,
-            "usage": usage
+            "usage": usage,
+            "examples": examples or [],
+            "note": note
         })
     
     @classmethod
@@ -53,11 +55,29 @@ class HelpInfo:
                     return cmd, category
         return None, None
 
-def command_help(category, description, usage=None):
-    """Decorator to add help documentation to a command."""
+def command_help(category, description, usage=None, examples=None, note=None):
+    """Decorator to add help documentation to a command.
+    
+    Args:
+        category: The command category ("general", "mod", "owner")
+        description: Description of what the command does
+        usage: How to use the command (format and parameters)
+        examples: List of example usages of the command
+        note: Additional notes or warnings about the command
+    """
     def decorator(func):
         cmd_name = func.__name__
-        HelpInfo.add_command(category, cmd_name, description, usage)
+        HelpInfo.add_command(category, cmd_name, description, usage, examples, note)
+        
+        # Store help info directly on the function for slash commands
+        func.help_info = {
+            "category": category,
+            "name": cmd_name,
+            "description": description,
+            "usage": usage,
+            "examples": examples or [],
+            "note": note
+        }
         
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
