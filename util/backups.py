@@ -3,6 +3,9 @@ import asyncio
 import datetime
 import json
 import os
+import random
+import string
+import time
 import traceback
 from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
@@ -24,7 +27,7 @@ class ServerBackupSystem:
         """Get the path for a guild's backup file"""
         return self.backup_dir / f"backup_{guild_id}.json"
     
-    async def create_backup(self, guild: discord.Guild) -> Dict[str, Any]:
+    async def create_backup(self, guild: discord.Guild) -> Union[bool, str]:
         """Create a complete backup of a server's structure
         
         Args:
@@ -244,7 +247,10 @@ class ServerBackupSystem:
                 
                 backup_data["bots"].append(bot_data)
         
-        return backup_data
+        backup_id = await self.save_backup(guild.id, backup_data)
+
+        # return success, result_msg, backup_id
+        return (True, "Backup created successfully", backup_id)
     
     async def save_backup(self, guild_id: int, backup_data: Dict[str, Any], custom_name: str = None) -> str:
         """Save backup data to file
@@ -255,29 +261,130 @@ class ServerBackupSystem:
             custom_name: Optional custom name for the backup
             
         Returns:
-            Path to the saved backup file
+            ID of the saved backup
         """
         try:
-            # Generate filename
+            # Generate a unique backup ID using timestamp and random string
+            timestamp = int(time.time())
+            random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+            backup_id = f"{timestamp}_{random_str}"
+            
+            # Add metadata to backup_data
+            backup_data['metadata'] = {
+                'backup_id': backup_id,
+                'created_at': timestamp,
+                'custom_name': custom_name
+            }
+            
+            # Generate filename with backup_id
             if custom_name:
                 # Sanitize custom name
                 safe_name = re.sub(r'[^\w\-\.]', '_', custom_name)
-                filename = f"backup_{guild_id}_{safe_name}.json"
+                filename = f"backup_{guild_id}_{backup_id}_{safe_name}.json"
             else:
-                date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"backup_{guild_id}_{date_str}.json"
+                filename = f"backup_{guild_id}_{backup_id}.json"
             
-            # Save backup
+            # Check if we need to delete old backups
+            existing_backups = await self.get_server_backups(guild_id)
+            
+            # If we have reached the limit, delete the oldest backup
+            MAX_BACKUPS = 10
+            if len(existing_backups) >= MAX_BACKUPS:
+                # Sort backups by creation timestamp (oldest first)
+                existing_backups.sort(key=lambda x: x.get('created_at', 0))
+                
+                # Delete oldest backup
+                oldest_backup = existing_backups[0]
+                oldest_backup_path = self.backup_dir / oldest_backup['filename']
+                
+                try:
+                    if os.path.exists(oldest_backup_path):
+                        os.remove(oldest_backup_path)
+                        self.logger.info(f"Deleted oldest backup {oldest_backup['filename']} to stay within limit")
+                except Exception as e:
+                    self.logger.error(f"Error deleting oldest backup: {str(e)}")
+            
+            # Save new backup
             backup_path = self.backup_dir / filename
             
             with open(backup_path, 'w', encoding='utf-8') as f:
                 json.dump(backup_data, f, indent=2)
             
-            return str(backup_path)
+            self.logger.info(f"Saved backup {filename} for guild {guild_id}")
+            return backup_id
         
         except Exception as e:
             self.logger.error(f"Error saving backup: {str(e)}\n{traceback.format_exc()}")
             raise
+            
+    async def get_server_backups(self, guild_id: int) -> List[Dict[str, Any]]:
+        """Get all backups for a specific server
+        
+        Args:
+            guild_id: The Discord guild ID
+            
+        Returns:
+            List of backup information dictionaries
+        """
+        try:
+            backups = []
+            backup_pattern = f"backup_{guild_id}*.json"
+            
+            for backup_file in self.backup_dir.glob(backup_pattern):
+                try:
+                    # Extract backup ID from filename
+                    # Format: backup_GUILDID_TIMESTAMP_RANDOM_[CUSTOMNAME].json
+                    filename_parts = backup_file.stem.split('_')
+                    if len(filename_parts) >= 4:  # At minimum: backup, guild_id, timestamp, random
+                        timestamp_str = filename_parts[2]
+                        
+                        # Get file stats
+                        stats = backup_file.stat()
+                        created_at = int(stats.st_mtime)
+                        file_size = round(stats.st_size / 1024, 2)  # Size in KB
+                        
+                        # Try to get metadata from file
+                        metadata = {}
+                        try:
+                            with open(backup_file, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                metadata = data.get('metadata', {})
+                        except:
+                            # If we can't read the file, use filename data
+                            pass
+                        
+                        # Use metadata if available, otherwise use filename/stats
+                        backup_id = metadata.get('backup_id', f"{timestamp_str}_{filename_parts[3]}")
+                        created_at = metadata.get('created_at', created_at)
+                        custom_name = metadata.get('custom_name', None)
+                        
+                        # Read file to get counts
+                        with open(backup_file, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            channel_count = len(data.get('channels', []))
+                            role_count = len(data.get('roles', []))
+                        
+                        backups.append({
+                            'id': backup_id,
+                            'filename': backup_file.name,
+                            'date': datetime.datetime.fromtimestamp(created_at).strftime('%Y-%m-%d %H:%M:%S'),
+                            'created_at': created_at,
+                            'file_size': file_size,
+                            'custom_name': custom_name,
+                            'channel_count': channel_count,
+                            'role_count': role_count
+                        })
+                except Exception as e:
+                    self.logger.error(f"Error processing backup file {backup_file}: {str(e)}")
+                    continue
+                
+            # Sort by creation date (newest first)
+            backups.sort(key=lambda x: x.get('created_at', 0), reverse=True)
+            return backups
+            
+        except Exception as e:
+            self.logger.error(f"Error listing backups: {str(e)}\n{traceback.format_exc()}")
+            return []
     
     async def load_backup(self, backup_id: str) -> Dict[str, Any]:
         """Load backup data from file
@@ -343,11 +450,12 @@ class ServerBackupSystem:
                     # Extract metadata
                     guild_info = data.get("guild", {})
                     backup_info = {
+                        "id": file.name[:-5],  # Remove .json extension
                         "filename": file.name,
                         "path": str(file),
                         "guild_id": guild_info.get("id"),
                         "guild_name": guild_info.get("name"),
-                        "backup_date": data.get("backup_date"),
+                        "date": data.get("backup_date"),
                         "member_count": guild_info.get("member_count"),
                         "channel_count": (
                             len(data.get("text_channels", [])) +
@@ -358,7 +466,7 @@ class ServerBackupSystem:
                         "role_count": len(data.get("roles", [])),
                         "emoji_count": len(data.get("emojis", [])),
                         "sticker_count": len(data.get("stickers", [])),
-                        "size_bytes": file.stat().st_size
+                        "file_size": file.stat().st_size
                     }
                     
                     backups.append(backup_info)

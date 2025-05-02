@@ -66,11 +66,15 @@ def command_help(category, description, usage=None, examples=None, note=None):
         note: Additional notes or warnings about the command
     """
     def decorator(func):
-        cmd_name = func.__name__
+        # If this is a command object (like HybridCommand), get its callback
+        actual_func = getattr(func, "callback", func)
+
+        cmd_name = getattr(actual_func, "__name__", "unknown")
+
         HelpInfo.add_command(category, cmd_name, description, usage, examples, note)
-        
-        # Store help info directly on the function for slash commands
-        func.help_info = {
+
+        # Store help info on the actual callable
+        actual_func.help_info = {
             "category": category,
             "name": cmd_name,
             "description": description,
@@ -78,11 +82,14 @@ def command_help(category, description, usage=None, examples=None, note=None):
             "examples": examples or [],
             "note": note
         }
-        
-        @functools.wraps(func)
+
+        @functools.wraps(actual_func)
         async def wrapper(*args, **kwargs):
-            return await func(*args, **kwargs)
-        return wrapper
+            return await actual_func(*args, **kwargs)
+
+        # Return the original object if it's already a command, else the wrapper
+        return func if hasattr(func, "callback") else wrapper
+
     return decorator
 
 # Helper functions for creating embeds

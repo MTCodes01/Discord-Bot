@@ -17,12 +17,12 @@ class ClearMessages(commands.Cog):
         """Initialize when bot is ready"""
         self.logger.info("Message clearing commands initialized")
     
+    @command_help("mod", "Clear messages from the channel", "clear [count]",
+                 examples=["clear 10", "clear 50"],
+                 note="Can clear up to 100 messages at once. Messages older than 14 days cannot be bulk-deleted due to Discord limitations.")
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @commands.hybrid_command(name="clear", aliases=["purge"], description="Clear a specified number of messages")
-    @command_help("mod", "Clear messages from the channel", "clear [count]", 
-                 examples=["clear 10", "clear 50"],
-                 note="Can clear up to 100 messages at once. Messages older than 14 days cannot be bulk-deleted due to Discord limitations.")
     async def clear(self, ctx, count: int = 10):
         """Clear a specified number of messages from the channel
 
@@ -67,12 +67,12 @@ class ClearMessages(commands.Cog):
             else:
                 await ctx.send(f"❌ Error deleting messages: {str(e)}")
     
+    @command_help("mod", "Clear messages from a specific user", "clearuser [user] [count]",
+                 examples=["clearuser @username 20", "clearuser 123456789012345678 50"],
+                 note="Can clear up to 100 messages at once. Messages older than 14 days cannot be bulk-deleted.")
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @commands.hybrid_command(name="clearuser", aliases=["purgeuser"], description="Clear messages from a specific user")
-    @command_help("mod", "Clear messages from a specific user", "clearuser [user] [count]", 
-                 examples=["clearuser @username 20", "clearuser 123456789012345678 50"],
-                 note="Can clear up to 100 messages at once. Messages older than 14 days cannot be bulk-deleted.")
     async def clear_user(self, ctx, user: discord.Member, count: int = 10):
         """Clear messages from a specific user in the channel
 

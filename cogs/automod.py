@@ -61,11 +61,15 @@ class AutoMod(commands.Cog):
     
     # === AutoMod Configuration Commands ===
     
+    @command_help(
+        category="mod",
+        description="View AutoMod status and configuration",
+        usage="automod",
+        examples=["automod"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "View AutoMod status and configuration", "automod", examples=["automod"])
     @commands.hybrid_group(name="automod", fallback="status")
-    @command_help("mod", "View AutoMod status and configuration", "automod")
     async def automod_group(self, ctx):
         """View AutoMod status and configuration"""
         await self.show_status(ctx)
@@ -79,11 +83,14 @@ class AutoMod(commands.Cog):
         
         await ctx.send(embed=embed)
     
+    @command_help(
+        category="mod",
+        description="Enable the AutoMod system for this server",
+        usage="automod enable"
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Enable the AutoMod system", "automod enable")
     @automod_group.command(name="enable", description="Enable the AutoMod system")
-    @command_help("mod", "Enable the AutoMod system for this server", "automod enable")
     async def automod_enable(self, ctx):
         """Enable automod for this server"""
         await ctx.defer()
@@ -108,11 +115,14 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send("❌ Failed to enable AutoMod.")
     
+    @command_help(
+        category="mod",
+        description="Disable the AutoMod system for this server",
+        usage="automod disable"
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Disable the AutoMod system", "automod disable")
     @automod_group.command(name="disable", description="Disable the AutoMod system")
-    @command_help("mod", "Disable the AutoMod system for this server", "automod disable")
     async def automod_disable(self, ctx):
         """Disable automod for this server"""
         await ctx.defer()
@@ -137,12 +147,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send("❌ Failed to disable AutoMod.")
     
+    @command_help(
+        category="mod",
+        description="Set the log channel for AutoMod",
+        usage="automod log_channel [channel]",
+        examples=["automod log_channel #automod-logs", "automod log_channel"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Set the log channel for AutoMod", "automod log_channel [channel]",
-                 examples=["automod log_channel #automod-logs", "automod log_channel"])
     @automod_group.command(name="log_channel", description="Set the log channel for AutoMod")
-    @command_help("mod", "Set the log channel for AutoMod notifications", "automod log_channel [channel]")
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the log channel for automod"""
         await ctx.defer()
@@ -181,13 +194,16 @@ class AutoMod(commands.Cog):
             else:
                 await ctx.send("❌ Failed to clear log channel.")
     
+    @command_help(
+        category="mod",
+        description="Configure an AutoMod module",
+        usage="automod module <module> [enabled] [action] [duration]",
+        examples=["automod module spam true timeout 10", "automod module words false", "automod module link true delete"],
+        note="Modules: spam, mention, link, words | Actions: delete, warn, timeout, kick"
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Configure an AutoMod module", "automod module <module> [enabled] [action] [duration]",
-                 examples=["automod module spam true timeout 10", "automod module words false", "automod module link true delete"])
     @automod_group.command(name="module", description="Configure an AutoMod module")
-    @command_help("mod", "Configure an AutoMod module", "automod module <module> [enabled] [action] [duration]",
-                 "Modules: spam, mention, link, words | Actions: delete, warn, timeout, kick")
     async def configure_module(self, ctx, 
                               module: str, 
                               enabled: bool = None, 
@@ -270,12 +286,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send("❌ Failed to update module configuration.")
     
+    @command_help(
+        category="mod",
+        description="Add or remove a role exempt from AutoMod",
+        usage="automod exempt_role <role> [remove]",
+        examples=["automod exempt_role @Moderators", "automod exempt_role @Moderators true"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Add or remove a role exempt from AutoMod", "automod exempt_role <role> [remove]",
-                 examples=["automod exempt_role @Moderators", "automod exempt_role @Moderators true"])
     @automod_group.command(name="exempt_role", description="Add or remove an exempt role")
-    @command_help("mod", "Add or remove a role exempt from AutoMod", "automod exempt_role <role> [remove]")
     async def exempt_role(self, ctx, role: discord.Role, remove: bool = False):
         """Add or remove a role exempt from automod"""
         await ctx.defer()
@@ -315,12 +334,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send("❌ Failed to update exempt roles.")
     
+    @command_help(
+        category="mod",
+        description="Add or remove a channel exempt from AutoMod",
+        usage="automod exempt_channel <channel> [remove]",
+        examples=["automod exempt_channel #bot-commands", "automod exempt_channel #bot-commands true"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Add or remove a channel exempt from AutoMod", "automod exempt_channel <channel> [remove]",
-                 examples=["automod exempt_channel #bot-commands", "automod exempt_channel #bot-commands true"])
     @automod_group.command(name="exempt_channel", description="Add or remove an exempt channel")
-    @command_help("mod", "Add or remove a channel exempt from AutoMod", "automod exempt_channel <channel> [remove]")
     async def exempt_channel(self, ctx, channel: discord.TextChannel, remove: bool = False):
         """Add or remove a channel exempt from automod"""
         await ctx.defer()
@@ -360,12 +382,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send("❌ Failed to update exempt channels.")
     
+    @command_help(
+        category="mod",
+        description="Add a word to the bad words filter",
+        usage="automod add_bad_word <word>",
+        examples=["automod add_bad_word badword"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Add a word to the bad words filter", "automod add_bad_word <word>",
-                 examples=["automod add_bad_word badword"])
     @automod_group.command(name="add_bad_word", description="Add a word to the bad words filter")
-    @command_help("mod", "Add a word to the bad words filter", "automod add_bad_word <word>")
     async def add_bad_word(self, ctx, *, word: str):
         """Add a word to the bad words filter"""
         await ctx.defer()
@@ -391,12 +416,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send(f"⚠️ '{word}' is already in the bad words list.")
     
+    @command_help(
+        category="mod",
+        description="Remove a word from the bad words filter",
+        usage="automod remove_bad_word <word>",
+        examples=["automod remove_bad_word badword"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Remove a word from the bad words filter", "automod remove_bad_word <word>",
-                 examples=["automod remove_bad_word badword"])
     @automod_group.command(name="remove_bad_word", description="Remove a word from the bad words filter")
-    @command_help("mod", "Remove a word from the bad words filter", "automod remove_bad_word <word>")
     async def remove_bad_word(self, ctx, *, word: str):
         """Remove a word from the bad words filter"""
         await ctx.defer()
@@ -428,11 +456,14 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send(f"⚠️ '{word}' was not found in the custom bad words list.")
     
+    @command_help(
+        category="mod",
+        description="List all custom bad words in the filter",
+        usage="automod list_bad_words"
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "List all custom bad words in the filter", "automod list_bad_words")
     @automod_group.command(name="list_bad_words", description="List all custom bad words")
-    @command_help("mod", "List all custom bad words in the filter", "automod list_bad_words")
     async def list_bad_words(self, ctx):
         """List all custom bad words in the filter"""
         await ctx.defer()
@@ -467,12 +498,15 @@ class AutoMod(commands.Cog):
         
         await ctx.send(embed=embed)
     
+    @command_help(
+        category="mod",
+        description="Add a domain to the link whitelist",
+        usage="automod add_link_whitelist <domain>",
+        examples=["automod add_link_whitelist discord.com"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Add a domain to the link whitelist", "automod add_link_whitelist <domain>",
-                 examples=["automod add_link_whitelist discord.com"])
     @automod_group.command(name="add_link_whitelist", description="Add a domain to the link whitelist")
-    @command_help("mod", "Add a domain to the link whitelist", "automod add_link_whitelist <domain>")
     async def add_link_whitelist(self, ctx, *, domain: str):
         """Add a domain to the link whitelist"""
         await ctx.defer()
@@ -507,12 +541,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send(f"⚠️ '{domain}' is already in the whitelist.")
     
+    @command_help(
+        category="mod",
+        description="Remove a domain from the link whitelist",
+        usage="automod remove_link_whitelist <domain>",
+        examples=["automod remove_link_whitelist discord.com"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Remove a domain from the link whitelist", "automod remove_link_whitelist <domain>",
-                 examples=["automod remove_link_whitelist discord.com"])
     @automod_group.command(name="remove_link_whitelist", description="Remove a domain from the link whitelist")
-    @command_help("mod", "Remove a domain from the link whitelist", "automod remove_link_whitelist <domain>")
     async def remove_link_whitelist(self, ctx, *, domain: str):
         """Remove a domain from the link whitelist"""
         await ctx.defer()
@@ -547,12 +584,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send(f"⚠️ '{domain}' is not in the whitelist.")
     
+    @command_help(
+        category="mod",
+        description="Add a domain to the link blacklist",
+        usage="automod add_link_blacklist <domain>",
+        examples=["automod add_link_blacklist badsite.com"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Add a domain to the link blacklist", "automod add_link_blacklist <domain>",
-                 examples=["automod add_link_blacklist badsite.com"])
     @automod_group.command(name="add_link_blacklist", description="Add a domain to the link blacklist")
-    @command_help("mod", "Add a domain to the link blacklist", "automod add_link_blacklist <domain>")
     async def add_link_blacklist(self, ctx, *, domain: str):
         """Add a domain to the link blacklist"""
         await ctx.defer()
@@ -587,12 +627,15 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send(f"⚠️ '{domain}' is already in the blacklist.")
     
+    @command_help(
+        category="mod",
+        description="Remove a domain from the link blacklist",
+        usage="automod remove_link_blacklist <domain>",
+        examples=["automod remove_link_blacklist badsite.com"]
+    )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @command_help("mod", "Remove a domain from the link blacklist", "automod remove_link_blacklist <domain>",
-                 examples=["automod remove_link_blacklist badsite.com"])
     @automod_group.command(name="remove_link_blacklist", description="Remove a domain from the link blacklist")
-    @command_help("mod", "Remove a domain from the link blacklist", "automod remove_link_blacklist <domain>")
     async def remove_link_blacklist(self, ctx, *, domain: str):
         """Remove a domain from the link blacklist"""
         await ctx.defer()

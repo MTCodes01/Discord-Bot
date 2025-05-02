@@ -6,6 +6,7 @@ import os
 import random
 import traceback
 import math
+from discord.ext import commands
 from typing import Dict, List, Optional, Union, Any, Tuple
 from pathlib import Path
 import io
@@ -17,7 +18,7 @@ class LevelingSystem:
     """Core system for user leveling and experience tracking"""
     
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
         self.logger = bot.logger
         
         # Set up data directory

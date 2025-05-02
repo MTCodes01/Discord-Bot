@@ -1005,7 +1005,16 @@ class LoggingSystem:
                 return False
                 
             # Send embed
-            await channel.send(embed=embed)
+            try:
+                if channel.permissions_for(guild.me).send_messages:
+                    await channel.send(embed=embed)
+                else:
+                    self.logger.warning(f"Missing permissions to send in #{channel.name} ({channel.id}) in guild {guild.id}")
+            except discord.Forbidden:
+                self.logger.warning(f"Forbidden: Cannot send to #{channel.name} ({channel.id}) in guild {guild.id}")
+            except discord.HTTPException as e:
+                self.logger.error(f"HTTPException while sending log message: {e}")
+
             
             return True
             

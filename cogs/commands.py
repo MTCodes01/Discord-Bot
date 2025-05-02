@@ -1,8 +1,11 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import config
 import sys
 import asyncio
+import os
+import logging
 from utils import owner_only, mod_only, command_help, HelpInfo, create_embed
 
 class HelpView(discord.ui.View):
@@ -14,7 +17,7 @@ class HelpView(discord.ui.View):
         self.commands_by_category = commands_by_category
         self.current_page = 0
         self.current_category = "all"  # Default to show all categories
-        self.items_per_page = 20
+        self.items_per_page = 10
         
         # Setup the category select dropdown
         self.category_select = self.create_category_select()
@@ -216,45 +219,90 @@ class Commands(commands.Cog):
     """Main commands for the bot."""
     
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
     
     # Core system commands (owner only)
-    @commands.command()
-    @owner_only()
     @command_help("owner", "Shuts down the bot completely", "shutdown")
+    @owner_only()
+    @commands.hybrid_command(name="shutdown", description="Shuts down the bot completely")
     async def shutdown(self, ctx):
         """Shut down the bot completely."""
-        await ctx.send("Shutting down... Goodbye!")
+        await ctx.send("Shutting down... Sayonara!")
+
+        # Safely close HTTP session if it exists
+        if hasattr(self.bot, "session"):
+            await self.bot.session.close()
+            
         await self.bot.close()
         
-    @commands.command()
+    @commands.hybrid_command(name="reboot", description="Reloads all cogs to update code")
     @owner_only()
     @command_help("owner", "Reloads all cogs to update code", "reboot")
     async def reboot(self, ctx):
         """Reload all cogs to implement code changes."""
-        message = await ctx.send("Rebooting cogs...")
-        
-        # Unload all cogs
-        for extension in list(self.bot.extensions):
+        from utils import HelpInfo
+        HelpInfo._commands = {"owner": [], "mod": [], "general": []}  # Clear all help data
+
+        message: discord.Message = await ctx.send("Rebooting cogs...")
+        extensions = list(self.bot.extensions)
+
+        for extension in extensions:
             try:
                 await self.bot.unload_extension(extension)
             except Exception as e:
                 await message.edit(content=f"Error unloading {extension}: {e}")
                 return
-                
-        # Load all cogs back
-        for extension in list(self.bot.extensions):
+
+        for extension in extensions:
             try:
                 await self.bot.load_extension(extension)
             except Exception as e:
                 await message.edit(content=f"Error loading {extension}: {e}")
                 return
-                
-        await message.edit(content="All cogs have been reloaded successfully!")
-        
+
+        await message.edit(content="✅ All cogs have been reloaded successfully!")
+
+    @command_help("owner", "Syncs application commands (slash commands)", "sync")
+    @owner_only()
+    @commands.hybrid_command(name="sync", description="Syncs application commands (slash commands)")
+    async def sync(self, ctx):
+        """Sync application commands (slash commands)."""
+        try:
+            synced = await self.bot.tree.sync()
+            await ctx.send(f"Synced {len(synced)} application commands.")
+        except Exception as e:
+            await ctx.send(f"Failed to sync application commands: {e}")
+        await ctx.send("All application commands have been synced successfully!")
+    
+    @command_help("owner", "Set the bot's status", "status [status]")
+    @owner_only()
+    @commands.hybrid_command(name="status", description="Set the bot's status")
+    async def status(self, ctx, *, status: str):
+        """Set the bot's status."""
+        await self.bot.change_presence(activity=discord.Game(name=status))
+        await ctx.send(f"Bot status set to: {status}")
+        await ctx.send("Bot status has been updated successfully!")
+
+    @command_help(
+        category="owner",
+        description="Lists all available cogs in the cogs folder",
+        usage="listcogs",
+        examples=["listcogs"],
+        note="Shows all .py files in the cogs directory"
+    )
+    @owner_only()
+    @commands.hybrid_command(name="listcogs", description="Lists all available cogs")
+    async def listcogs(self, ctx):
+        """List all .py files in the cogs folder."""
+        files = [f[:-3] for f in os.listdir("./cogs") if f.endswith(".py") and not f.startswith("__")]
+        if files:
+            await ctx.send("📁 Available cogs:\n" + "\n".join(f"- `{f}`" for f in files))
+        else:
+            await ctx.send("⚠️ No cogs found.")
+    
     # Help commands
-    @commands.command()
     @command_help("general", "Shows help information for commands", "help [command]")
+    @commands.hybrid_command(name="help", description="Shows help information for commands")
     async def help(self, ctx, command_name=None):
         """Display help information for commands."""
         if command_name:
@@ -280,15 +328,22 @@ class Commands(commands.Cog):
             await ctx.send(embed=view.get_embed(), view=view)
     
     # Example commands
-    @commands.command()
-    @mod_only()
     @command_help("mod", "Example command for moderators", "mod_command")
+    @mod_only()
+    @commands.hybrid_command(name="mod", description="Example command for demonstration of mod-only access")
     async def mod_command(self, ctx):
         """Example moderator command."""
         await ctx.send("This is a moderator-only command!")
     
-    @commands.command()
+    @command_help("owner", "Example command for bot owners", "owner_command")
+    @owner_only()
+    @commands.hybrid_command(name="owner", description="Example command for demonstration of owner-only access")
+    async def owner_command(self, ctx):
+        """Example owner-only command."""
+        await ctx.send("This is an owner-only command!")
+    
     @command_help("general", "Ping the bot to check latency", "ping")
+    @commands.hybrid_command(name="ping", description="Check the bot's latency")
     async def ping(self, ctx):
         """Check the bot's latency."""
         latency = round(self.bot.latency * 1000)

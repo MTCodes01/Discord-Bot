@@ -1,9 +1,11 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import config
 import os
 import logging
 import asyncio
+import aiohttp
 
 # Setup logging
 logging.basicConfig(
@@ -29,20 +31,26 @@ intents.bans = True             # For ban logging
 intents = discord.Intents.all()
 
 # Disable the default help command
-bot = commands.Bot(command_prefix=config.PREFIX, intents=intents, help_command=None)
+bot: commands.Bot = commands.Bot(command_prefix=config.PREFIX, intents=intents, help_command=None)
 bot.logger = logger  # Add logger to bot for access in cogs
 
-# Bot events
-@bot.event
-async def on_ready():
-    logger.info(f"Bot is ready! Logged in as {bot.user}")
-    
+async def setup_hook():
+    logger.info("Running setup_hook...")
+    bot.session = aiohttp.ClientSession()
+
     # Load cogs
     try:
         await load_extensions()
         logger.info("All extensions loaded successfully")
     except Exception as e:
         logger.error(f"Failed to load extensions: {e}")
+
+bot.setup_hook = setup_hook
+
+# Bot events
+@bot.event
+async def on_ready():
+    logger.info(f"Bot is ready! Logged in as {bot.user}")
 
     # Sync application commands (slash commands)
     try:
@@ -64,8 +72,8 @@ async def on_ready():
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
-        return
-    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("Command not found.")
+    elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"Missing required argument: {error.param.name}")
     elif isinstance(error, commands.BadArgument):
         await ctx.send(f"Bad argument: {error}")
@@ -74,6 +82,22 @@ async def on_command_error(ctx, error):
     else:
         logger.error(f"Command error: {error}")
         await ctx.send(f"An error occurred: {error}")
+
+# Slash command error handler
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandNotFound):
+        logger.error(f"Slash command not found: {error}")
+        if interaction.response.is_done():
+            await interaction.followup.send("Slash command not found.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Slash command not found.", ephemeral=True)
+    else:
+        logger.error(f"App command error: {error}")
+        if interaction.response.is_done():
+            await interaction.followup.send("An error occurred.", ephemeral=True)
+        else:
+            await interaction.response.send_message("An error occurred.", ephemeral=True)
 
 # Extension loading
 async def load_extensions():
