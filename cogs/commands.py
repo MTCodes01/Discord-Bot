@@ -349,5 +349,60 @@ class Commands(commands.Cog):
         latency = round(self.bot.latency * 1000)
         await ctx.send(f"Pong! Latency: {latency}ms")
 
+
+    @command_help("general", "Display the server rules", "rules")
+    @commands.hybrid_command(name="rules", description="Display the server rules")
+    async def rules(self, ctx):
+        embed = discord.Embed(
+            title="📜 ISTE CEAL Discord Server Rules",
+            description="Welcome to the official ISTE CEAL server! This is a chill space to learn, create, and connect. "
+                        "To keep things smooth and respectful for everyone, here are some simple ground rules:",
+            color=discord.Color.from_str("#58B9FF")
+        )
+
+        embed.add_field(
+            name="🗣️ Be Respectful",
+            value="Treat everyone kindly. Avoid bullying, rude behavior, or personal attacks. "
+                  "Healthy discussions are great—just keep it friendly.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="❌ No Hateful or Offensive Language",
+            value="Avoid slurs, hate speech, or anything that makes the server uncomfortable. "
+                  "Casual swearing is okay—don’t go overboard or be toxic.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🌍 Speak Any Language",
+            value="Use whatever language you're comfortable with. "
+                  "Just keep things inclusive in public channels when possible.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📌 Stay On Topic",
+            value="Use each channel for its intended purpose. Keep memes, music, and chill convos in the right spots.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🚫 No Spam or Random Promotions",
+            value="Avoid spamming messages, emojis, or links. Don’t advertise other servers or content without checking first.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="⚠️ Rule Violations",
+            value="We’re a relaxed community, but if someone’s ruining the vibe, "
+                  "actions like a warning or mute might happen—nothing personal.",
+            inline=False
+        )
+
+        embed.set_footer(text="🎉 Let’s make this a fun and welcoming space for all ISTE CEAL members!")
+
+        await ctx.send(embed=embed)
+
 async def setup(bot):
     await bot.add_cog(Commands(bot))
