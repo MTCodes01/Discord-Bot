@@ -8,10 +8,6 @@ services:
     working_dir: /app
     command: python main.py
 
-    # Load secrets safely
-    env_file:
-      - .env
-
     # Optional: map source code for live reload (remove in production)
     volumes:
       - .:/app
