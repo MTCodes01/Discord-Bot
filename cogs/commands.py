@@ -262,17 +262,25 @@ class Commands(commands.Cog):
 
         await message.edit(content="✅ All cogs have been reloaded successfully!")
 
-    @command_help("owner", "Syncs application commands (slash commands)", "sync")
+    @command_help("owner", "Syncs application commands (slash commands)", "sync [guild]")
     @owner_only()
     @commands.hybrid_command(name="sync", description="Syncs application commands (slash commands)")
-    async def sync(self, ctx):
-        """Sync application commands (slash commands)."""
+    async def sync(self, ctx, scope: str = None):
+        """Sync application commands (slash commands).
+        
+        Scope 'guild' syncs only to the current server (immediate).
+        No scope syncs globally (takes up to an hour).
+        """
         try:
-            synced = await self.bot.tree.sync()
-            await ctx.send(f"Synced {len(synced)} application commands.")
+            if scope == "guild" or scope == "local":
+                synced = await self.bot.tree.sync(guild=ctx.guild)
+                await ctx.send(f"Synced {len(synced)} application commands to **this guild**.")
+            else:
+                synced = await self.bot.tree.sync()
+                await ctx.send(f"Synced {len(synced)} application commands **globally**.")
         except Exception as e:
             await ctx.send(f"Failed to sync application commands: {e}")
-        await ctx.send("All application commands have been synced successfully!")
+        await ctx.send("Application command sync completed!")
     
     @command_help("owner", "Set the bot's status", "status [status]")
     @owner_only()

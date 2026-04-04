@@ -171,7 +171,7 @@ class AutoMod(commands.Cog):
     )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @automod_group.command(name="enable", description="Enable the AutoMod system")
+    @automod_group.command(name="enable", description="Enable the AutoMod system", aliases=["automod_enable"])
     async def automod_enable(self, ctx):
         """Enable automod for this server"""
         await ctx.defer()
@@ -203,7 +203,7 @@ class AutoMod(commands.Cog):
     )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @automod_group.command(name="disable", description="Disable the AutoMod system")
+    @automod_group.command(name="disable", description="Disable the AutoMod system", aliases=["automod_disable"])
     async def automod_disable(self, ctx):
         """Disable automod for this server"""
         await ctx.defer()
@@ -236,7 +236,7 @@ class AutoMod(commands.Cog):
     )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @automod_group.command(name="log_channel", description="Set the log channel for AutoMod")
+    @automod_group.command(name="log_channel", description="Set the log channel for AutoMod", aliases=["automod_log"])
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the log channel for automod"""
         await ctx.defer()
