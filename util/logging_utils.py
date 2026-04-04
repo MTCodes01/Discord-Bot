@@ -14,7 +14,7 @@ class LogEmbed:
     """Utility class for creating log embeds"""
     
     @staticmethod
-    def message_delete(message):
+    def message_delete(message, executor=None):
         """Create an embed for a deleted message"""
         embed = discord.Embed(
             title="🗑️ Message Deleted",
@@ -48,6 +48,9 @@ class LogEmbed:
         # Add author thumbnail
         if message.author.avatar:
             embed.set_thumbnail(url=message.author.avatar.url)
+            
+        if executor:
+            embed.add_field(name="Deleted By", value=f"{executor.mention} ({executor.id})", inline=False)
             
         return embed
     
@@ -195,7 +198,7 @@ class LogEmbed:
         return embed
     
     @staticmethod
-    def role_create(role):
+    def role_create(role, executor=None):
         """Create an embed for a role creation event"""
         embed = discord.Embed(
             title="🎭 Role Created",
@@ -215,7 +218,7 @@ class LogEmbed:
         return embed
     
     @staticmethod
-    def role_delete(role):
+    def role_delete(role, executor=None):
         """Create an embed for a role deletion event"""
         embed = discord.Embed(
             title="🎭 Role Deleted",
@@ -235,7 +238,7 @@ class LogEmbed:
         return embed
     
     @staticmethod
-    def role_update(before, after):
+    def role_update(before, after, executor=None):
         """Create an embed for a role update event"""
         embed = discord.Embed(
             title="🎭 Role Updated",
@@ -287,10 +290,13 @@ class LogEmbed:
         # Add role info
         embed.add_field(name="ID", value=after.id, inline=True)
         
+        if executor:
+            embed.add_field(name="Updated By", value=f"{executor.mention} ({executor.id})", inline=False)
+        
         return embed
     
     @staticmethod
-    def channel_create(channel):
+    def channel_create(channel, executor=None):
         """Create an embed for a channel creation event"""
         embed = discord.Embed(
             title="📝 Channel Created",
@@ -310,11 +316,14 @@ class LogEmbed:
         # Add category if available
         if hasattr(channel, 'category') and channel.category:
             embed.add_field(name="Category", value=channel.category.name, inline=True)
+            
+        if executor:
+            embed.add_field(name="Created By", value=f"{executor.mention} ({executor.id})", inline=False)
         
         return embed
     
     @staticmethod
-    def channel_delete(channel):
+    def channel_delete(channel, executor=None):
         """Create an embed for a channel deletion event"""
         embed = discord.Embed(
             title="📝 Channel Deleted",
@@ -334,11 +343,14 @@ class LogEmbed:
         # Add category if available
         if hasattr(channel, 'category') and channel.category:
             embed.add_field(name="Category", value=channel.category.name, inline=True)
+            
+        if executor:
+            embed.add_field(name="Deleted By", value=f"{executor.mention} ({executor.id})", inline=False)
         
         return embed
     
     @staticmethod
-    def channel_update(before, after):
+    def channel_update(before, after, executor=None):
         """Create an embed for a channel update event"""
         embed = discord.Embed(
             title="📝 Channel Updated",
@@ -414,6 +426,9 @@ class LogEmbed:
         
         # Add channel info
         embed.add_field(name="ID", value=after.id, inline=True)
+        
+        if executor:
+            embed.add_field(name="Updated By", value=f"{executor.mention} ({executor.id})", inline=False)
         
         return embed
     
@@ -1001,7 +1016,7 @@ class LoggingSystem:
             channel = await self.get_log_channel(guild, channel_type)
             
             if not channel:
-                self.logger.warning(f"No log channel found for {channel_type} in guild {guild.id}")
+                self.logger.debug(f"No log channel found for {channel_type} in guild {guild.id}")
                 return False
                 
             # Send embed

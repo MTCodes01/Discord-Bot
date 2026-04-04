@@ -24,6 +24,19 @@ class ServerLogging(commands.Cog):
         """Initialize logging system when bot is ready"""
         self.logger.info("Logging system initialized")
     
+    async def get_audit_log_executor(self, guild, action, target_id=None):
+        if not guild.me.guild_permissions.view_audit_log:
+            return None
+        try:
+            await asyncio.sleep(1.0)
+            async for entry in guild.audit_logs(action=action, limit=5):
+                if (discord.utils.utcnow() - entry.created_at).total_seconds() < 10:
+                    if target_id is None or (hasattr(entry.target, 'id') and entry.target.id == target_id) or entry.target == target_id:
+                        return entry.user
+        except Exception:
+            pass
+        return None
+
     # === Event Listeners ===
     
     @commands.Cog.listener()
@@ -38,8 +51,13 @@ class ServerLogging(commands.Cog):
             return
             
         try:
+            # Check who deleted it
+            executor = await self.get_audit_log_executor(message.guild, discord.AuditLogAction.message_delete, message.author.id)
+            
+            self.logger.info(f"[Guild: {message.guild.name}] Message by {message.author} deleted in #{message.channel.name}" + (f" by {executor}" if executor else ""))
+
             # Create embed
-            embed = LogEmbed.message_delete(message)
+            embed = LogEmbed.message_delete(message, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(message.guild, "message-log", embed)
@@ -60,6 +78,8 @@ class ServerLogging(commands.Cog):
         
         if not guild:
             return
+            
+        self.logger.info(f"[Guild: {guild.name}] Bulk message delete ({len(messages)} messages) in #{first_message.channel.name}")
             
         try:
             # Create embed
@@ -95,6 +115,8 @@ class ServerLogging(commands.Cog):
             return
             
         try:
+            self.logger.info(f"[Guild: {before.guild.name}] Message by {after.author} edited in #{after.channel.name}")
+
             # Create embed
             embed = LogEmbed.message_edit(before, after)
             
@@ -112,6 +134,8 @@ class ServerLogging(commands.Cog):
         #     return
             
         try:
+            self.logger.info(f"[Guild: {member.guild.name}] Member joined: {member}")
+
             # Create embed
             embed = LogEmbed.member_join(member)
             
@@ -129,6 +153,8 @@ class ServerLogging(commands.Cog):
         #     return
             
         try:
+            self.logger.info(f"[Guild: {member.guild.name}] Member left/kicked: {member}")
+
             # Create embed
             embed = LogEmbed.member_leave(member)
             
@@ -151,6 +177,8 @@ class ServerLogging(commands.Cog):
             return
             
         try:
+            self.logger.info(f"[Guild: {after.guild.name}] Member updated: {after}")
+
             # Create embed
             embed = LogEmbed.member_update(before, after)
             
@@ -163,6 +191,7 @@ class ServerLogging(commands.Cog):
     @commands.Cog.listener()
     async def on_member_ban(self, guild, user):
         """Log member bans"""
+        self.logger.info(f"[Guild: {guild.name}] Member banned: {user}")
         try:
             # Create embed
             embed = discord.Embed(
@@ -199,6 +228,7 @@ class ServerLogging(commands.Cog):
     @commands.Cog.listener()
     async def on_member_unban(self, guild, user):
         """Log member unbans"""
+        self.logger.info(f"[Guild: {guild.name}] Member unbanned: {user}")
         try:
             # Create embed
             embed = discord.Embed(
@@ -224,8 +254,11 @@ class ServerLogging(commands.Cog):
     async def on_guild_role_create(self, role):
         """Log role creation"""
         try:
+            executor = await self.get_audit_log_executor(role.guild, discord.AuditLogAction.role_create, role.id)
+            self.logger.info(f"[Guild: {role.guild.name}] Role created: {role.name}" + (f" by {executor}" if executor else ""))
+
             # Create embed
-            embed = LogEmbed.role_create(role)
+            embed = LogEmbed.role_create(role, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(role.guild, "role-log", embed)
@@ -237,8 +270,11 @@ class ServerLogging(commands.Cog):
     async def on_guild_role_delete(self, role):
         """Log role deletion"""
         try:
+            executor = await self.get_audit_log_executor(role.guild, discord.AuditLogAction.role_delete, role.id)
+            self.logger.info(f"[Guild: {role.guild.name}] Role deleted: {role.name}" + (f" by {executor}" if executor else ""))
+
             # Create embed
-            embed = LogEmbed.role_delete(role)
+            embed = LogEmbed.role_delete(role, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(role.guild, "role-log", embed)
@@ -259,8 +295,11 @@ class ServerLogging(commands.Cog):
             return
             
         try:
+            executor = await self.get_audit_log_executor(after.guild, discord.AuditLogAction.role_update, after.id)
+            self.logger.info(f"[Guild: {after.guild.name}] Role updated: {after.name}" + (f" by {executor}" if executor else ""))
+
             # Create embed
-            embed = LogEmbed.role_update(before, after)
+            embed = LogEmbed.role_update(before, after, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(after.guild, "role-log", embed)
@@ -272,8 +311,11 @@ class ServerLogging(commands.Cog):
     async def on_guild_channel_create(self, channel):
         """Log channel creation"""
         try:
+            executor = await self.get_audit_log_executor(channel.guild, discord.AuditLogAction.channel_create, channel.id)
+            self.logger.info(f"[Guild: {channel.guild.name}] Channel created: {channel.name}" + (f" by {executor}" if executor else ""))
+
             # Create embed
-            embed = LogEmbed.channel_create(channel)
+            embed = LogEmbed.channel_create(channel, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(channel.guild, "server-log", embed)
@@ -285,8 +327,11 @@ class ServerLogging(commands.Cog):
     async def on_guild_channel_delete(self, channel):
         """Log channel deletion"""
         try:
+            executor = await self.get_audit_log_executor(channel.guild, discord.AuditLogAction.channel_delete, channel.id)
+            self.logger.info(f"[Guild: {channel.guild.name}] Channel deleted: {channel.name}" + (f" by {executor}" if executor else ""))
+
             # Create embed
-            embed = LogEmbed.channel_delete(channel)
+            embed = LogEmbed.channel_delete(channel, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(channel.guild, "server-log", embed)
@@ -304,8 +349,11 @@ class ServerLogging(commands.Cog):
                 return
                 
         try:
+            executor = await self.get_audit_log_executor(after.guild, discord.AuditLogAction.channel_update, after.id)
+            self.logger.info(f"[Guild: {after.guild.name}] Channel updated: {after.name}" + (f" by {executor}" if executor else ""))
+
             # Create embed
-            embed = LogEmbed.channel_update(before, after)
+            embed = LogEmbed.channel_update(before, after, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(after.guild, "server-log", embed)
@@ -321,6 +369,8 @@ class ServerLogging(commands.Cog):
             return
             
         try:
+            self.logger.info(f"[Guild: {member.guild.name}] Voice state update for: {member}")
+
             # Create embed
             embed = LogEmbed.voice_state_update(member, before, after)
             
