@@ -52,6 +52,7 @@ class AutoModerationSystem:
                 "enabled": True,
                 "words": [],
                 "custom_words": [],
+                "use_defaults": True,
                 "action": "strike",
                 "strikes": 1
             },
@@ -62,7 +63,7 @@ class AutoModerationSystem:
                 "strikes": 2
             },
             "anti_caps": {
-                "enabled": False,
+                "enabled": True,
                 "threshold_percent": 70,
                 "min_length": 15,
                 "action": "strike",
@@ -503,9 +504,13 @@ class AutoModerationSystem:
         default_words = self.default_bad_words
         custom_words = config.get("custom_words", [])
         
-        # Combine lists if needed
+        # Combine lists
         bad_words = set(custom_words)
-        if config.get("words", []) or not custom_words:
+        bad_words.update(config.get("words", []))
+        
+        # Also include global default words if configured to do so
+        # or if no other words are defined
+        if not bad_words or config.get("use_defaults", True):
             bad_words.update(default_words)
         
         # Normalize message content
