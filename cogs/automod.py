@@ -11,6 +11,68 @@ import traceback
 from utils import command_help
 
 
+class AutoModReviewView(discord.ui.View):
+    """View with buttons for moderator review of suspected violations"""
+    def __init__(self, automod_system, message, rules, strikes):
+        super().__init__(timeout=None)
+        self.automod = automod_system
+        self.message = message
+        self.rules = rules
+        self.strikes = strikes
+
+    @discord.ui.button(label="✅ Confirm & Strike", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        # Add the strikes manually
+        rules_str = ", ".join([r.replace('_', ' ').title() for r in self.rules])
+        config = await self.automod.get_config(interaction.guild.id)
+        
+        # We call take_action with needs_review=False to actually execute it
+        await self.automod.take_action(self.message, self.rules, "strike", self.strikes, needs_review=False)
+        
+        # Update the original message to show it was handled
+        embed = interaction.message.embeds[0]
+        embed.title = "🛡️ AutoMod: Violation Confirmed"
+        embed.color = discord.Color.green()
+        embed.add_field(name="Handled By", value=interaction.user.mention, inline=False)
+        
+        # Disable all buttons
+        for child in self.children:
+            child.disabled = True
+            
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    @discord.ui.button(label="⚠️ Warn Only", style=discord.ButtonStyle.yellow)
+    async def warn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        # Just send a warning action
+        await self.automod.take_action(self.message, self.rules, "warn", 0, needs_review=False)
+        
+        embed = interaction.message.embeds[0]
+        embed.title = "⚖️ AutoMod: User Warned (No Strike)"
+        embed.color = discord.Color.gold()
+        embed.add_field(name="Handled By", value=interaction.user.mention, inline=False)
+        
+        for child in self.children:
+            child.disabled = True
+            
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    @discord.ui.button(label="❌ False Positive", style=discord.ButtonStyle.red)
+    async def ignore(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        
+        embed = interaction.message.embeds[0]
+        embed.title = "✅ AutoMod: Dismissed"
+        embed.color = discord.Color.light_grey()
+        embed.add_field(name="Dismissed By", value=interaction.user.mention, inline=False)
+        
+        for child in self.children:
+            child.disabled = True
+            
+        await interaction.edit_original_response(embed=embed, view=self)
+
+
 class AutoMod(commands.Cog):
     """Automated server moderation system"""
     
@@ -34,10 +96,20 @@ class AutoMod(commands.Cog):
         
         # Process message through automod
         try:
-            violation, rule, action = await self.automod.check_message(message)
+            violation, rules, strikes, action, needs_review = await self.automod.check_message(message)
             
             if violation:
-                await self.automod.take_action(message, rule, action)
+                review_embed = await self.automod.take_action(message, rules, action, strikes, needs_review)
+                
+                if needs_review and review_embed:
+                    # Send the review request to the log channel
+                    config = await self.automod.get_config(message.guild.id)
+                    log_channel_id = config.get("log_channel_id")
+                    if log_channel_id:
+                        log_channel = message.guild.get_channel(log_channel_id)
+                        if log_channel:
+                            view = AutoModReviewView(self.automod, message, rules, strikes)
+                            await log_channel.send(embed=review_embed, view=view)
                 
         except Exception as e:
             self.logger.error(f"AutoMod error: {str(e)}\n{traceback.format_exc()}")
@@ -51,10 +123,19 @@ class AutoMod(commands.Cog):
             
         # Process the edited message
         try:
-            violation, rule, action = await self.automod.check_message(after)
+            violation, rules, strikes, action, needs_review = await self.automod.check_message(after)
             
             if violation:
-                await self.automod.take_action(after, rule, action)
+                review_embed = await self.automod.take_action(after, rules, action, strikes, needs_review)
+                
+                if needs_review and review_embed:
+                    config = await self.automod.get_config(after.guild.id)
+                    log_channel_id = config.get("log_channel_id")
+                    if log_channel_id:
+                        log_channel = after.guild.get_channel(log_channel_id)
+                        if log_channel:
+                            view = AutoModReviewView(self.automod, after, rules, strikes)
+                            await log_channel.send(embed=review_embed, view=view)
                 
         except Exception as e:
             self.logger.error(f"AutoMod error on edit: {str(e)}\n{traceback.format_exc()}")

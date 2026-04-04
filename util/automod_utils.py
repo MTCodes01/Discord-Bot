@@ -24,8 +24,10 @@ class AutoModerationSystem:
                 "1": "warn",
                 "2": "timeout_10m",
                 "3": "timeout_1h",
-                "4": "kick",
-                "5": "ban"
+                "5": "timeout_12h",
+                "7": "timeout_24h",
+                "10": "kick",
+                "15": "ban"
             }
         },
         "modules": {
@@ -99,6 +101,29 @@ class AutoModerationSystem:
         
         # Load default bad words list
         self.default_bad_words = self._load_default_bad_words()
+        
+        # Leet-speak replacement mapping
+        self.leet_mapping = {
+            '4': 'a', '@': 'a', '8': 'b', '3': 'e', '1': 'i', '!': 'i', '0': 'o', 
+            '5': 's', '$': 's', '7': 't', '9': 'g', '2': 'z', '6': 'g', 'z': 's'
+        }
+    
+    def _normalize_content(self, content: str) -> str:
+        """Normalize content to handle leet-speak and bypasses"""
+        # Convert to lowercase
+        normalized = content.lower()
+        
+        # Replace common leet characters
+        for char, replacement in self.leet_mapping.items():
+            normalized = normalized.replace(char, replacement)
+            
+        # Remove extra whitespace and special characters used to bypass filters
+        normalized = re.sub(r'[^a-z\s]', '', normalized)
+        
+        # Collapse repeated characters (e.g., "ffffuuuu" -> "fu")
+        normalized = re.sub(r'(.)\1+', r'\1', normalized)
+        
+        return normalized
     
     def _load_default_bad_words(self) -> List[str]:
         """Load default bad words list"""
@@ -304,76 +329,100 @@ class AutoModerationSystem:
         
         return current_active + value
     
-    async def check_message(self, message: discord.Message) -> Tuple[bool, Optional[str], Optional[str]]:
-        """Check a message against automod rules
+    async def check_message(self, message: discord.Message) -> Tuple[bool, List[str], int, str, bool]:
+        """Check a message against automod rules (Accumulative)
         
-        Args:
-            message: The Discord message
-            
         Returns:
-            Tuple of (violation_found, rule_name, action)
+            Tuple of (violation_found, rule_names, total_strikes, primary_action, needs_review)
         """
         # Skip if no guild
         if not message.guild:
-            return False, None, None
+            return False, [], 0, "delete", False
             
         # Get config
         config = await self.get_config(message.guild.id)
         
         # Skip if automod disabled
         if not config.get("enabled", False):
-            return False, None, None
+            return False, [], 0, "delete", False
             
         # Skip exempt users/channels
         if await self.is_exempt(message, config):
-            return False, None, None
+            return False, [], 0, "delete", False
             
+        violations = []
+        total_strikes = 0
+        primary_action = "delete"
+        needs_review = False
+        
         # Check against each rule
         
         # 1. Anti-spam
         spam_config = config["modules"]["anti_spam"]
         if spam_config.get("enabled", False):
             if await self._check_spam(message, spam_config):
-                return True, "anti_spam", spam_config.get("action", "delete")
+                violations.append("anti_spam")
+                total_strikes += spam_config.get("strikes", 1)
+                if spam_config.get("action") == "strike":
+                    primary_action = "strike"
         
         # 2. Anti-mention spam
         mention_config = config["modules"]["anti_mention_spam"]
         if mention_config.get("enabled", False):
             if await self._check_mention_spam(message, mention_config):
-                return True, "anti_mention_spam", mention_config.get("action", "delete")
+                violations.append("anti_mention_spam")
+                total_strikes += mention_config.get("strikes", 1)
+                primary_action = "strike"
         
         # 3. Link filter
         link_config = config["modules"]["link_filter"]
         if link_config.get("enabled", False):
             if await self._check_links(message, link_config):
-                return True, "link_filter", link_config.get("action", "delete")
+                violations.append("link_filter")
+                total_strikes += link_config.get("strikes", 2)
+                primary_action = "strike"
         
-        # 4. Bad words filter
+        # 4. Bad words filter (includes normalization/fuzzy detection as requested)
         words_config = config["modules"]["bad_words"]
         if words_config.get("enabled", False):
-            if await self._check_bad_words(message, words_config):
-                return True, "bad_words", words_config.get("action", "strike")
+            found, review_needed = await self._check_bad_words(message, words_config)
+            if found:
+                violations.append("bad_words")
+                total_strikes += words_config.get("strikes", 1)
+                primary_action = "strike"
+                if review_needed:
+                    needs_review = True
                 
         # 5. Anti-invite
         invite_config = config["modules"].get("anti_invite", {})
         if invite_config.get("enabled", False):
             if await self._check_invites(message, invite_config):
-                return True, "anti_invite", invite_config.get("action", "strike")
+                violations.append("anti_invite")
+                total_strikes += invite_config.get("strikes", 2)
+                primary_action = "strike"
                 
         # 6. Anti-caps
         caps_config = config["modules"].get("anti_caps", {})
         if caps_config.get("enabled", False):
             if await self._check_caps(message, caps_config):
-                return True, "anti_caps", caps_config.get("action", "warn")
+                violations.append("anti_caps")
+                total_strikes += caps_config.get("strikes", 1)
+                if primary_action != "strike":
+                    primary_action = "warn"
                 
         # 7. Anti-Zalgo
         zalgo_config = config["modules"].get("anti_zalgo", {})
         if zalgo_config.get("enabled", False):
             if await self._check_zalgo(message, zalgo_config):
-                return True, "anti_zalgo", zalgo_config.get("action", "strike")
+                violations.append("anti_zalgo")
+                total_strikes += zalgo_config.get("strikes", 1)
+                primary_action = "strike"
         
+        if violations:
+            return True, violations, total_strikes, primary_action, needs_review
+            
         # No violations
-        return False, None, None
+        return False, [], 0, "delete", False
     
     async def _check_spam(self, message: discord.Message, config: Dict[str, Any]) -> bool:
         """Check for message spam
@@ -493,19 +542,15 @@ class AutoModerationSystem:
         
         return False
     
-    async def _check_bad_words(self, message: discord.Message, config: Dict[str, Any]) -> bool:
+    async def _check_bad_words(self, message: discord.Message, config: Dict[str, Any]) -> Tuple[bool, bool]:
         """Check for bad words
         
-        Args:
-            message: The Discord message
-            config: Bad words filter configuration
-            
         Returns:
-            True if bad word detected, False otherwise
+            Tuple of (found, review_needed)
         """
         # Skip if empty message
         if not message.content:
-            return False
+            return False, False
             
         # Get word lists
         default_words = self.default_bad_words
@@ -522,15 +567,22 @@ class AutoModerationSystem:
         
         # Normalize message content
         content = message.content.lower()
+        normalized_content = self._normalize_content(message.content)
         
         # Check for bad words
         for word in bad_words:
-            # Check for word boundaries
-            pattern = r'\b' + re.escape(word.lower()) + r'\b'
+            word_lower = word.lower()
+            # Check for word boundaries in original content
+            pattern = r'\b' + re.escape(word_lower) + r'\b'
             if re.search(pattern, content):
-                return True
+                return True, False # Exact match, no review needed
+                
+            # Check for fuzzy/normalized match (detects bypasses like a55)
+            # Use original word without boundaries on normalized content for better detection
+            if word_lower in normalized_content:
+                return True, True # Fuzzy/Leet match, needs review
         
-        return False
+        return False, False
         
     async def _check_invites(self, message: discord.Message, config: Dict[str, Any]) -> bool:
         if not message.content:
@@ -572,31 +624,44 @@ class AutoModerationSystem:
         zalgo_pattern = r'[\u0300-\u036F\u1AB0-\u1AFF\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]{3,}'
         return bool(re.search(zalgo_pattern, message.content))
     
-    async def take_action(self, message: discord.Message, rule: str, action: str) -> None:
-        """Take action against a user for a violation handling strike mechanics"""
+    async def take_action(self, message: discord.Message, rules: List[str], action: str, total_strikes: int, needs_review: bool = False) -> Optional[discord.Embed]:
+        """Take action against a user for violation(s) handling strike mechanics"""
         try:
             guild = message.guild
             user = message.author
             config = await self.get_config(guild.id)
             
-            # Module config and strike value
-            module_config = config["modules"].get(rule, {})
-            
             # Always try to delete the message first
             try:
                 await message.delete()
-            except discord.errors.NotFound:
-                pass
-            except discord.errors.Forbidden:
+            except (discord.errors.NotFound, discord.errors.Forbidden):
                 pass
                 
+            rules_str = ", ".join([r.replace('_', ' ').title() for r in rules])
+            
+            if needs_review:
+                # Create review embed for the Cog to send with buttons
+                embed = discord.Embed(
+                    title="🔍 AutoMod: Review Requested",
+                    description=f"Suspicious activity detected in {message.channel.mention}",
+                    color=discord.Color.yellow(),
+                    timestamp=datetime.datetime.now()
+                )
+                embed.add_field(name="User", value=f"{user.mention} ({user.id})", inline=True)
+                embed.add_field(name="Suspected Rules", value=rules_str, inline=True)
+                embed.add_field(name="Potential Strikes", value=f"+{total_strikes}", inline=True)
+                
+                content = message.content[:1020] + "..." if len(message.content) > 1024 else message.content
+                embed.add_field(name="Message Content", value=content, inline=False)
+                
+                return embed
+            
             # Process strikes and determine real action
-            strikes_to_add = module_config.get("strikes", 1)
-            duration_minutes = module_config.get("duration_minutes", 0) # Fallback duration if module specifies
+            duration_minutes = 0
             current_strikes = 0
             
             if action == "strike":
-                current_strikes = await self.add_strike(guild.id, user.id, rule, strikes_to_add, config)
+                current_strikes = await self.add_strike(guild.id, user.id, rules_str, total_strikes, config)
                 system_config = config.get("strike_system", {})
                 thresholds = system_config.get("thresholds", {})
                 
@@ -615,6 +680,8 @@ class AutoModerationSystem:
                         duration_minutes = 10
                     elif real_action == "timeout_1h":
                         duration_minutes = 60
+                    elif real_action == "timeout_12h":
+                        duration_minutes = 720
                     elif real_action == "timeout_24h":
                         duration_minutes = 1440
                 elif real_action == "kick":
@@ -635,7 +702,7 @@ class AutoModerationSystem:
                     color=discord.Color.red()
                 )
                 
-                dm_embed.add_field(name="Reason", value=f"Violation: {rule.replace('_', ' ').title()}", inline=False)
+                dm_embed.add_field(name="Reason", value=f"Violation: {rules_str}", inline=False)
                 
                 if current_strikes > 0:
                     dm_embed.add_field(name="Active Strikes", value=f"{current_strikes}", inline=True)
@@ -649,16 +716,18 @@ class AutoModerationSystem:
             
             # Execute physical action
             if action == "timeout" and duration_minutes > 0:
-                await user.timeout(datetime.timedelta(minutes=duration_minutes), reason=f"AutoMod: {rule} ({current_strikes} strikes)")
+                await user.timeout(datetime.timedelta(minutes=duration_minutes), reason=f"AutoMod: {rules_str} ({current_strikes} strikes)")
             elif action == "kick":
-                await guild.kick(user, reason=f"AutoMod: {rule} ({current_strikes} strikes)")
+                await guild.kick(user, reason=f"AutoMod: {rules_str} ({current_strikes} strikes)")
             elif action == "ban":
-                await guild.ban(user, reason=f"AutoMod: {rule} ({current_strikes} strikes)")
+                await guild.ban(user, reason=f"AutoMod: {rules_str} ({current_strikes} strikes)")
             
-            await self._log_action(message, rule, action, duration_minutes, strikes=current_strikes, added_strikes=strikes_to_add)
+            await self._log_action(message, rules_str, action, duration_minutes, strikes=current_strikes, added_strikes=total_strikes)
+            return None
             
         except Exception as e:
             self.logger.error(f"Error taking automod action: {str(e)}")
+            return None
             
     async def _log_action(self, message: discord.Message, rule: str, action: str, duration: int, strikes: int = 0, added_strikes: int = 0) -> None:
         try:
