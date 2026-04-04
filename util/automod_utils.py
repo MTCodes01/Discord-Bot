@@ -6,6 +6,8 @@ import json
 from typing import Dict, List, Optional, Union, Any, Tuple
 from pathlib import Path
 import traceback
+import copy
+import config
 
 
 class AutoModerationSystem:
@@ -50,7 +52,7 @@ class AutoModerationSystem:
             },
             "bad_words": {
                 "enabled": True,
-                "words": [],
+                "words": config.BAD_WORDS or [],
                 "custom_words": [],
                 "use_defaults": True,
                 "action": "strike",
@@ -152,8 +154,13 @@ class AutoModerationSystem:
                 self.logger.error(f"Error loading automod config for {guild_id}: {str(e)}")
         
         # Use default if no config found
-        self.server_configs[guild_id] = self.DEFAULT_CONFIG.copy()
-        return self.server_configs[guild_id]
+        config = copy.deepcopy(self.DEFAULT_CONFIG)
+        self.server_configs[guild_id] = config
+        
+        # Automatically save the default config so the user can see it
+        await self.save_config(guild_id, config)
+        
+        return config
     
     async def save_config(self, guild_id: int, config: Dict[str, Any]) -> bool:
         """Save automod configuration for a guild
@@ -183,7 +190,7 @@ class AutoModerationSystem:
     
     def _merge_with_defaults(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Ensure config has all required fields by merging with defaults"""
-        merged = self.DEFAULT_CONFIG.copy()
+        merged = copy.deepcopy(self.DEFAULT_CONFIG)
         
         # Top level merge
         for key, value in config.items():
@@ -199,7 +206,7 @@ class AutoModerationSystem:
     
     def _merge_dicts(self, default: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         """Helper to recursively merge dictionaries"""
-        result = default.copy()
+        result = copy.deepcopy(default)
         
         for key, value in override.items():
             if key in result and isinstance(result[key], dict) and isinstance(value, dict):
