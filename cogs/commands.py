@@ -354,53 +354,72 @@ class Commands(commands.Cog):
     @commands.hybrid_command(name="rules", description="Display the server rules")
     async def rules(self, ctx):
         embed = discord.Embed(
-            title="📜 ISTE CEAL Discord Server Rules",
-            description="Welcome to the official ISTE CEAL server! This is a chill space to learn, create, and connect. "
-                        "To keep things smooth and respectful for everyone, here are some simple ground rules:",
+            title="📜 Server Rules",
+            description="Welcome to the server! To keep this a friendly, safe, and productive space for everyone, please follow these rules:",
             color=discord.Color.from_str("#58B9FF")
         )
 
         embed.add_field(
-            name="🗣️ Be Respectful",
-            value="Treat everyone kindly. Avoid bullying, rude behavior, or personal attacks. "
-                  "Healthy discussions are great—just keep it friendly.",
+            name="1️⃣ Be respectful",
+            value="Treat everyone kindly. No hate speech, bullying, or harassment.",
             inline=False
         )
 
         embed.add_field(
-            name="❌ No Hateful or Offensive Language",
-            value="Avoid slurs, hate speech, or anything that makes the server uncomfortable. "
-                  "Casual swearing is okay—don’t go overboard or be toxic.",
+            name="2️⃣ Stay on topic",
+            value="Use the correct channels for specific topics.",
             inline=False
         )
 
         embed.add_field(
-            name="🌍 Speak Any Language",
-            value="Use whatever language you're comfortable with. "
-                  "Just keep things inclusive in public channels when possible.",
+            name="3️⃣ No spam or self-promotion",
+            value="Avoid mass messages, links, or ads without permission.",
             inline=False
         )
 
         embed.add_field(
-            name="📌 Stay On Topic",
-            value="Use each channel for its intended purpose. Keep memes, music, and chill convos in the right spots.",
+            name="4️⃣ Use appropriate language",
+            value="No NSFW or offensive content. Keep it clean.",
             inline=False
         )
 
         embed.add_field(
-            name="🚫 No Spam or Random Promotions",
-            value="Avoid spamming messages, emojis, or links. Don’t advertise other servers or content without checking first.",
+            name="5️⃣ Respect privacy",
+            value="Do not share personal or sensitive info — yours or others’.",
             inline=False
         )
 
         embed.add_field(
-            name="⚠️ Rule Violations",
-            value="We’re a relaxed community, but if someone’s ruining the vibe, "
-                  "actions like a warning or mute might happen—nothing personal.",
+            name="6️⃣ Follow Discord’s Terms of Service",
+            value="Keep it legal and respectful.",
             inline=False
         )
 
-        embed.set_footer(text="🎉 Let’s make this a fun and welcoming space for all ISTE CEAL members!")
+        embed.add_field(
+            name="7️⃣ Respect mods",
+            value="Moderators help keep things safe. Follow their instructions.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="8️⃣ No piracy or illegal content",
+            value="No cracked software, pirated media, or hacks.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="9️⃣ Keep names & avatars appropriate",
+            value="No offensive usernames or profile pictures.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🔟 No impersonation",
+            value="Don't pretend to be someone else, including staff members or other users.",
+            inline=False
+        )
+
+        embed.set_footer(text="✅ Thanks for being a part of our FOSS CEAL community! Let's make it awesome together.")
 
         await ctx.send(embed=embed)
 
