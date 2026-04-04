@@ -758,7 +758,7 @@ class AutoMod(commands.Cog):
                 await ctx.send("❌ Failed to update link blacklist.")
         else:
             await ctx.send(f"⚠️ '{domain}' is not in the blacklist.")
-
+    
     @command_help(
         category="mod",
         description="Check active strikes for a user",
@@ -828,7 +828,7 @@ class AutoMod(commands.Cog):
         embed.add_field(name="New Total", value=f"{new_total} strikes", inline=False)
         
         await ctx.send(embed=embed)
-
+    
     @command_help(
         category="mod",
         description="Clear all strikes from a user",
@@ -858,6 +858,6 @@ class AutoMod(commands.Cog):
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"⚠️ {user.mention} has no strikes to clear.")
-
+    
 async def setup(bot):
     await bot.add_cog(AutoMod(bot))
