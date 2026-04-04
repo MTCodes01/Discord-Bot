@@ -20,7 +20,7 @@ class AutoModReviewView(discord.ui.View):
         self.rules = rules
         self.strikes = strikes
 
-    @discord.ui.button(label="✅ Confirm & Strike", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="✅ Confirm & Strike", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         # Add the strikes manually
@@ -42,7 +42,7 @@ class AutoModReviewView(discord.ui.View):
             
         await interaction.edit_original_response(embed=embed, view=self)
 
-    @discord.ui.button(label="⚠️ Warn Only", style=discord.ButtonStyle.yellow)
+    @discord.ui.button(label="⚠️ Warn Only", style=discord.ButtonStyle.secondary)
     async def warn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         # Just send a warning action
@@ -58,7 +58,7 @@ class AutoModReviewView(discord.ui.View):
             
         await interaction.edit_original_response(embed=embed, view=self)
 
-    @discord.ui.button(label="❌ False Positive", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="❌ False Positive", style=discord.ButtonStyle.danger)
     async def ignore(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         
