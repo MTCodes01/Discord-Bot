@@ -38,6 +38,52 @@ venv\Scripts\activate
 python main.py
 ```
 
+## Docker Deployment
+
+You can seamlessly deploy this bot using Docker or Docker Compose. This is the recommended approach for continuous 24/7 hosting.
+
+### Using Docker Compose (Recommended)
+
+1. Ensure your `config.py` is configured.
+2. Run the compose environment in detached mode:
+```bash
+docker-compose up -d --build
+```
+3. To view the logs, run:
+```bash
+docker-compose logs -f
+```
+
+### Using Standard Docker CLI
+
+1. Build the Docker image:
+```bash
+docker build -t discord-bot-image .
+```
+2. Run the container:
+```bash
+docker run -d --name discord-worker -v ./data:/app/data -v ./backups:/app/backups discord-bot-image
+```
+*Note: We mount the `./data` and `./backups` directories to ensure that automod configs and leveling data persist across container restarts.*
+
+## Backing Up Data
+
+To safely backup your persistent bot data (such as the automod config and saved states) to an external directory, you can create a compressed `.tar.gz` archive. Run this command inside the bot's root folder:
+
+```bash
+tar -czvf /path/to/your/safe/location/discord_bot_backup_$(date +%F).tar.gz ./data ./backups
+```
+*Note: Replace `/path/to/your/safe/location/` with the actual path where you want the backup to be stored.*
+
+### Restoring Data
+
+To restore your data from a backup archive, navigate to your bot's root folder and extract the archive:
+
+```bash
+tar -xzvf /path/to/your/safe/location/discord_bot_backup_YYYY-MM-DD.tar.gz
+```
+*Note: This will overwrite the current `./data` and `./backups` folders with the versions stored inside the backup.*
+
 ## Project Structure
 
 ```
