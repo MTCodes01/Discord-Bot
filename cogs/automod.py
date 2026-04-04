@@ -198,8 +198,8 @@ class AutoMod(commands.Cog):
         category="mod",
         description="Configure an AutoMod module",
         usage="automod module <module> [enabled] [action] [duration]",
-        examples=["automod module spam true timeout 10", "automod module words false", "automod module link true delete"],
-        note="Modules: spam, mention, link, words | Actions: delete, warn, timeout, kick"
+        examples=["automod module spam true strike 1", "automod module words false", "automod module link true delete"],
+        note="Modules: spam, mention, link, words, invite, caps, zalgo | Actions: strike, delete, warn, timeout, kick"
     )
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
@@ -214,8 +214,8 @@ class AutoMod(commands.Cog):
         Parameters:
             module: The module to configure (spam, mention, link, words)
             enabled: Whether to enable or disable the module
-            action: The action to take (delete, warn, timeout, kick)
-            duration: The duration in minutes for timeouts
+            action: The action to take (strike, delete, warn, timeout, kick)
+            duration: The duration in minutes for timeouts, or the number of strikes for action 'strike'
         """
         await ctx.defer()
         
@@ -224,14 +224,17 @@ class AutoMod(commands.Cog):
             "spam": "anti_spam",
             "mention": "anti_mention_spam",
             "link": "link_filter",
-            "words": "bad_words"
+            "words": "bad_words",
+            "invite": "anti_invite",
+            "caps": "anti_caps",
+            "zalgo": "anti_zalgo"
         }
         
         # Get the full module name
         module_name = module_mapping.get(module.lower(), module.lower())
         
         # Valid actions
-        valid_actions = ["delete", "warn", "timeout", "kick"]
+        valid_actions = ["strike", "delete", "warn", "timeout", "kick"]
         
         # Get current config
         config = await self.automod.get_config(ctx.guild.id)
@@ -256,13 +259,15 @@ class AutoMod(commands.Cog):
                 
             module_config["action"] = action.lower()
             
-        # Update duration if provided
         if duration is not None:
             if duration < 0:
-                await ctx.send("❌ Duration cannot be negative.")
+                await ctx.send("❌ Value cannot be negative.")
                 return
                 
-            module_config["duration_minutes"] = duration
+            if action and action.lower() == "strike":
+                module_config["strikes"] = duration
+            else:
+                module_config["duration_minutes"] = duration
             
         # Save config
         success = await self.automod.save_config(ctx.guild.id, config)
@@ -280,7 +285,10 @@ class AutoMod(commands.Cog):
                 response += f"\n- Action set to '{action}'"
                 
             if duration is not None:
-                response += f"\n- Duration set to {duration} minutes"
+                if action and action.lower() == "strike":
+                    response += f"\n- Strikes set to {duration}"
+                else:
+                    response += f"\n- Duration set to {duration} minutes"
                 
             await ctx.send(response, embed=embed)
         else:
@@ -670,6 +678,105 @@ class AutoMod(commands.Cog):
         else:
             await ctx.send(f"⚠️ '{domain}' is not in the blacklist.")
 
+    @command_help(
+        category="mod",
+        description="Check active strikes for a user",
+        usage="automod strikes <user>",
+        examples=["automod strikes @User"]
+    )
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @automod_group.command(name="strikes", description="Check active strikes for a user")
+    async def automod_strikes(self, ctx, user: discord.Member):
+        """Check active strikes for a user"""
+        await ctx.defer()
+        
+        config = await self.automod.get_config(ctx.guild.id)
+        active_strikes = await self.automod.get_active_strikes(ctx.guild.id, user.id, config)
+        
+        embed = discord.Embed(
+            title="⚖️ User Strikes",
+            description=f"{user.mention} currently has **{active_strikes}** active strikes.",
+            color=discord.Color.blue() if active_strikes == 0 else discord.Color.orange()
+        )
+        
+        # List individual strikes
+        strikes_list = config.get("strikes", {}).get(str(user.id), [])
+        now = datetime.datetime.now().timestamp()
+        valid = [s for s in strikes_list if s.get("expires", 0) > now]
+        
+        if valid:
+            details = []
+            for i, s in enumerate(valid, 1):
+                rule = s.get("rule", "Manual").replace('_', ' ').title()
+                val = s.get("value", 1)
+                exp = discord.utils.format_dt(datetime.datetime.fromtimestamp(s.get("expires", 0)), style="R")
+                details.append(f"**{i}.** `{rule}` (+{val}) - Expires {exp}")
+            embed.add_field(name="Active Strike History", value="\n".join(details), inline=False)
+            
+        await ctx.send(embed=embed)
+        
+    @command_help(
+        category="mod",
+        description="Add manual strikes to a user",
+        usage="automod add_strike <user> <amount> [reason]",
+        examples=["automod add_strike @User 1 Warning"]
+    )
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @automod_group.command(name="add_strike", description="Add manual strikes to a user")
+    async def automod_add_strike(self, ctx, user: discord.Member, amount: int = 1, *, reason: str = "Manual application"):
+        """Add manual strikes to a user"""
+        await ctx.defer()
+        
+        if amount <= 0:
+            await ctx.send("❌ Amount must be positive.")
+            return
+            
+        config = await self.automod.get_config(ctx.guild.id)
+        
+        # Add the strike
+        new_total = await self.automod.add_strike(ctx.guild.id, user.id, f"Manual: {reason}", amount, config)
+        
+        embed = discord.Embed(
+            title="⚒️ Strike Added",
+            description=f"Added **{amount}** strikes to {user.mention}.",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.add_field(name="New Total", value=f"{new_total} strikes", inline=False)
+        
+        await ctx.send(embed=embed)
+
+    @command_help(
+        category="mod",
+        description="Clear all strikes from a user",
+        usage="automod clear_strikes <user>",
+        examples=["automod clear_strikes @User"]
+    )
+    @commands.guild_only()
+    @commands.has_permissions(administrator=True)
+    @automod_group.command(name="clear_strikes", description="Clear all strikes from a user")
+    async def automod_clear_strikes(self, ctx, user: discord.Member):
+        """Clear all active strikes from a user"""
+        await ctx.defer()
+        
+        config = await self.automod.get_config(ctx.guild.id)
+        
+        strikes_data = config.get("strikes", {})
+        if str(user.id) in strikes_data:
+            del strikes_data[str(user.id)]
+            config["strikes"] = strikes_data
+            await self.automod.save_config(ctx.guild.id, config)
+            
+            embed = discord.Embed(
+                title="🧹 Strikes Cleared",
+                description=f"Successfully removed all strikes from {user.mention}.",
+                color=discord.Color.green()
+            )
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"⚠️ {user.mention} has no strikes to clear.")
 
 async def setup(bot):
     await bot.add_cog(AutoMod(bot))

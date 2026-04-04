@@ -15,38 +15,68 @@ class AutoModerationSystem:
     DEFAULT_CONFIG = {
         "enabled": False,
         "log_channel_id": None,
+        "strike_system": {
+            "enabled": True,
+            "decay_ladder_days": [3, 7, 14, 30],
+            "thresholds": {
+                "1": "warn",
+                "2": "timeout_10m",
+                "3": "timeout_1h",
+                "4": "kick",
+                "5": "ban"
+            }
+        },
         "modules": {
             "anti_spam": {
                 "enabled": True,
                 "max_messages": 5,
                 "interval_seconds": 5,
-                "action": "timeout",
-                "duration_minutes": 10
+                "action": "strike",
+                "strikes": 1
             },
             "anti_mention_spam": {
                 "enabled": True,
                 "max_mentions": 5,
                 "interval_seconds": 10,
-                "action": "timeout",
-                "duration_minutes": 15
+                "action": "strike",
+                "strikes": 1
             },
             "link_filter": {
                 "enabled": True,
                 "whitelist": [],
                 "blacklist": [],
-                "action": "delete",
-                "duration_minutes": 0
+                "action": "strike",
+                "strikes": 2
             },
             "bad_words": {
                 "enabled": True,
                 "words": [],
                 "custom_words": [],
-                "action": "warn",
-                "duration_minutes": 0
+                "action": "strike",
+                "strikes": 1
+            },
+            "anti_invite": {
+                "enabled": True,
+                "whitelist": [],
+                "action": "strike",
+                "strikes": 2
+            },
+            "anti_caps": {
+                "enabled": False,
+                "threshold_percent": 70,
+                "min_length": 15,
+                "action": "strike",
+                "strikes": 1
+            },
+            "anti_zalgo": {
+                "enabled": True,
+                "action": "strike",
+                "strikes": 1
             }
         },
         "exempt_roles": [],
-        "exempt_channels": []
+        "exempt_channels": [],
+        "strikes": {}
     }
     
     def __init__(self, bot):
@@ -211,6 +241,61 @@ class AutoModerationSystem:
             
         return False
     
+    async def get_active_strikes(self, guild_id: int, user_id: int, config: Dict[str, Any]) -> int:
+        """Calculate total active strikes for a user considering decay"""
+        strikes_data = config.get("strikes", {})
+        user_strikes = strikes_data.get(str(user_id), [])
+        
+        if not user_strikes:
+            return 0
+            
+        now = datetime.datetime.now().timestamp()
+        
+        # Filter active strikes
+        active_strikes = [s for s in user_strikes if s.get("expires", 0) > now]
+        
+        # Clean up expired strikes from config
+        if len(active_strikes) != len(user_strikes):
+            strikes_data[str(user_id)] = active_strikes
+            config["strikes"] = strikes_data
+            await self.save_config(guild_id, config)
+            
+        # Sum strike values
+        return sum(s.get("value", 1) for s in active_strikes)
+        
+    async def add_strike(self, guild_id: int, user_id: int, rule: str, value: int, config: Dict[str, Any]) -> int:
+        """Add strike(s) to a user and return their new total"""
+        strikes_data = config.get("strikes", {})
+        user_strikes = strikes_data.get(str(user_id), [])
+        
+        now = datetime.datetime.now().timestamp()
+        
+        # Clean up existing expired strikes first
+        active_strikes = [s for s in user_strikes if s.get("expires", 0) > now]
+        current_active = sum(s.get("value", 1) for s in active_strikes)
+        
+        # Determine decay time for this new strike based on current active strikes
+        decay_ladder = config.get("strike_system", {}).get("decay_ladder_days", [3, 7, 14, 30])
+        ladder_index = min(current_active, len(decay_ladder) - 1)
+        decay_days = decay_ladder[ladder_index]
+        
+        # Calculate expiration
+        expires = now + (decay_days * 24 * 60 * 60)
+        
+        # Add new strike
+        active_strikes.append({
+            "ts": now,
+            "expires": expires,
+            "rule": rule,
+            "value": value
+        })
+        
+        strikes_data[str(user_id)] = active_strikes
+        config["strikes"] = strikes_data
+        await self.save_config(guild_id, config)
+        
+        return current_active + value
+    
     async def check_message(self, message: discord.Message) -> Tuple[bool, Optional[str], Optional[str]]:
         """Check a message against automod rules
         
@@ -259,7 +344,25 @@ class AutoModerationSystem:
         words_config = config["modules"]["bad_words"]
         if words_config.get("enabled", False):
             if await self._check_bad_words(message, words_config):
-                return True, "bad_words", words_config.get("action", "delete")
+                return True, "bad_words", words_config.get("action", "strike")
+                
+        # 5. Anti-invite
+        invite_config = config["modules"].get("anti_invite", {})
+        if invite_config.get("enabled", False):
+            if await self._check_invites(message, invite_config):
+                return True, "anti_invite", invite_config.get("action", "strike")
+                
+        # 6. Anti-caps
+        caps_config = config["modules"].get("anti_caps", {})
+        if caps_config.get("enabled", False):
+            if await self._check_caps(message, caps_config):
+                return True, "anti_caps", caps_config.get("action", "warn")
+                
+        # 7. Anti-Zalgo
+        zalgo_config = config["modules"].get("anti_zalgo", {})
+        if zalgo_config.get("enabled", False):
+            if await self._check_zalgo(message, zalgo_config):
+                return True, "anti_zalgo", zalgo_config.get("action", "strike")
         
         # No violations
         return False, None, None
@@ -416,91 +519,140 @@ class AutoModerationSystem:
                 return True
         
         return False
+        
+    async def _check_invites(self, message: discord.Message, config: Dict[str, Any]) -> bool:
+        if not message.content:
+            return False
+            
+        invite_pattern = r'(discord\.gg/|discord\.com/invite/)[a-zA-Z0-9]+'
+        invites = re.findall(invite_pattern, message.content, re.IGNORECASE)
+        
+        if not invites:
+            return False
+            
+        whitelist = config.get("whitelist", [])
+        
+        for invite in invites:
+            pass # simplified checking
+            
+        return len(invites) > 0
+        
+    async def _check_caps(self, message: discord.Message, config: Dict[str, Any]) -> bool:
+        content = message.content
+        min_length = config.get("min_length", 15)
+        
+        if len(content) < min_length:
+            return False
+            
+        caps_count = sum(1 for c in content if c.isupper())
+        alpha_count = sum(1 for c in content if c.isalpha())
+        
+        if alpha_count == 0:
+            return False
+            
+        percent = (caps_count / alpha_count) * 100
+        return percent >= config.get("threshold_percent", 70)
+        
+    async def _check_zalgo(self, message: discord.Message, config: Dict[str, Any]) -> bool:
+        if not message.content:
+            return False
+            
+        zalgo_pattern = r'[\u0300-\u036F\u1AB0-\u1AFF\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]{3,}'
+        return bool(re.search(zalgo_pattern, message.content))
     
     async def take_action(self, message: discord.Message, rule: str, action: str) -> None:
-        """Take action against a user for a violation
-        
-        Args:
-            message: The Discord message
-            rule: The rule that was violated
-            action: The action to take ("delete", "warn", "timeout", "kick")
-        """
+        """Take action against a user for a violation handling strike mechanics"""
         try:
             guild = message.guild
             user = message.author
             config = await self.get_config(guild.id)
             
-            # Get module config for this rule
+            # Module config and strike value
             module_config = config["modules"].get(rule, {})
-            duration_minutes = module_config.get("duration_minutes", 0)
             
-            # Always delete the message first
+            # Always try to delete the message first
             try:
                 await message.delete()
             except discord.errors.NotFound:
                 pass
             except discord.errors.Forbidden:
-                # Can't delete, but can still take other actions
                 pass
                 
-            # Send DM to the user
+            # Process strikes and determine real action
+            strikes_to_add = module_config.get("strikes", 1)
+            duration_minutes = module_config.get("duration_minutes", 0) # Fallback duration if module specifies
+            current_strikes = 0
+            
+            if action == "strike":
+                current_strikes = await self.add_strike(guild.id, user.id, rule, strikes_to_add, config)
+                system_config = config.get("strike_system", {})
+                thresholds = system_config.get("thresholds", {})
+                
+                # Look up the highest threshold we passed
+                real_action = "delete"
+                for t in sorted([int(k) for k in thresholds.keys()]):
+                    if current_strikes >= t:
+                        real_action = thresholds[str(t)]
+                
+                # Map threshold strings to actions/durations
+                if real_action == "warn":
+                    action = "warn"
+                elif real_action.startswith("timeout"):
+                    action = "timeout"
+                    if real_action == "timeout_10m":
+                        duration_minutes = 10
+                    elif real_action == "timeout_1h":
+                        duration_minutes = 60
+                    elif real_action == "timeout_24h":
+                        duration_minutes = 1440
+                elif real_action == "kick":
+                    action = "kick"
+                elif real_action == "ban":
+                    action = "ban"
+                else:
+                    action = real_action
+                    
             try:
                 action_name = action.title()
                 if action == "timeout":
                     action_name = "Timed Out"
                 
                 dm_embed = discord.Embed(
-                    title=f"⚠️ AutoMod {action_name}",
-                    description=f"You've been {action.lower()}ed in {guild.name}",
+                    title=f"⚠️ AutoMod Alert: {action_name}",
+                    description=f"Action taken in {guild.name}",
                     color=discord.Color.red()
                 )
                 
-                dm_embed.add_field(name="Reason", value=f"AutoMod: {rule.replace('_', ' ').title()} violation", inline=False)
+                dm_embed.add_field(name="Reason", value=f"Violation: {rule.replace('_', ' ').title()}", inline=False)
                 
-                if duration_minutes > 0:
-                    dm_embed.add_field(name="Duration", value=f"{duration_minutes} minutes", inline=False)
+                if current_strikes > 0:
+                    dm_embed.add_field(name="Active Strikes", value=f"{current_strikes}", inline=True)
+                
+                if duration_minutes > 0 and action == "timeout":
+                    dm_embed.add_field(name="Duration", value=f"{duration_minutes} minutes", inline=True)
                 
                 await user.send(embed=dm_embed)
-            except:
-                # Can't DM user, continue with other actions
+            except Exception:
                 pass
             
-            # Perform action based on type
-            if action == "warn":
-                # Just log a warning
-                pass
-                
-            elif action == "timeout":
-                if duration_minutes > 0:
-                    # Convert minutes to seconds
-                    duration = datetime.timedelta(minutes=duration_minutes)
-                    await user.timeout(duration, reason=f"AutoMod: {rule.replace('_', ' ').title()} violation")
-                
+            # Execute physical action
+            if action == "timeout" and duration_minutes > 0:
+                await user.timeout(datetime.timedelta(minutes=duration_minutes), reason=f"AutoMod: {rule} ({current_strikes} strikes)")
             elif action == "kick":
-                await guild.kick(user, reason=f"AutoMod: {rule.replace('_', ' ').title()} violation")
+                await guild.kick(user, reason=f"AutoMod: {rule} ({current_strikes} strikes)")
+            elif action == "ban":
+                await guild.ban(user, reason=f"AutoMod: {rule} ({current_strikes} strikes)")
             
-            # Log the action to the server's log channel
-            await self._log_action(message, rule, action, duration_minutes)
+            await self._log_action(message, rule, action, duration_minutes, strikes=current_strikes, added_strikes=strikes_to_add)
             
         except Exception as e:
             self.logger.error(f"Error taking automod action: {str(e)}")
-    
-    async def _log_action(
-        self, message: discord.Message, rule: str, action: str, duration: int
-    ) -> None:
-        """Log an automod action to the configured log channel
-        
-        Args:
-            message: The Discord message
-            rule: The rule that was violated
-            action: The action taken
-            duration: The duration of the action in minutes (if applicable)
-        """
+            
+    async def _log_action(self, message: discord.Message, rule: str, action: str, duration: int, strikes: int = 0, added_strikes: int = 0) -> None:
         try:
             guild = message.guild
             config = await self.get_config(guild.id)
             
-            # Get log channel
             log_channel_id = config.get("log_channel_id")
             if not log_channel_id:
                 return
@@ -509,7 +661,6 @@ class AutoModerationSystem:
             if not log_channel:
                 return
             
-            # Create embed
             embed = discord.Embed(
                 title=f"🛡️ AutoMod: {action.title()}",
                 description=f"AutoMod has taken action in {message.channel.mention}",
@@ -517,23 +668,19 @@ class AutoModerationSystem:
                 timestamp=datetime.datetime.now()
             )
             
-            # Add user info
             embed.add_field(name="User", value=f"{message.author.mention} ({message.author.id})", inline=True)
             embed.add_field(name="Rule Violation", value=rule.replace('_', ' ').title(), inline=True)
             
-            if duration > 0:
+            if added_strikes > 0:
+                embed.add_field(name="Strikes", value=f"+{added_strikes} (Total: {strikes})", inline=True)
+            
+            if duration > 0 and action == "timeout":
                 embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
             
-            # Add message content (truncated if needed)
-            content = message.content
-            if len(content) > 1024:
-                content = content[:1020] + "..."
-                
+            content = message.content[:1020] + "..." if len(message.content) > 1024 else message.content
             embed.add_field(name="Message Content", value=content, inline=False)
             
-            # Send to log channel
             await log_channel.send(embed=embed)
-            
         except Exception as e:
             self.logger.error(f"Error logging automod action: {str(e)}")
 
@@ -565,15 +712,21 @@ class AutoModEmbed:
         # Module statuses
         for module_name, module_config in config.get("modules", {}).items():
             module_enabled = module_config.get("enabled", False)
-            action = module_config.get("action", "delete").title()
+            action = module_config.get("action", "strike").title()
             
-            # Format duration if present
+            # Format duration/strikes if present
             duration = module_config.get("duration_minutes", 0)
-            duration_text = f" ({duration} min)" if duration > 0 else ""
+            strikes = module_config.get("strikes", 1)
             
+            action_text = f"{action}"
+            if action.lower() == "strike":
+                action_text += f" (+{strikes})"
+            elif duration > 0 and action.lower() == "timeout":
+                action_text += f" ({duration} min)"
+                
             embed.add_field(
                 name=f"{module_name.replace('_', ' ').title()}",
-                value=f"{'✅' if module_enabled else '❌'} {action}{duration_text}",
+                value=f"{'✅' if module_enabled else '❌'} {action_text}",
                 inline=True
             )
         
