@@ -120,9 +120,6 @@ class AutoModerationSystem:
         # Remove extra whitespace and special characters used to bypass filters
         normalized = re.sub(r'[^a-z\s]', '', normalized)
         
-        # Collapse repeated characters (e.g., "ffffuuuu" -> "fu")
-        normalized = re.sub(r'(.)\1+', r'\1', normalized)
-        
         return normalized
     
     def _load_default_bad_words(self) -> List[str]:
@@ -577,9 +574,11 @@ class AutoModerationSystem:
             if re.search(pattern, content):
                 return True, False # Exact match, no review needed
                 
-            # Check for fuzzy/normalized match (detects bypasses like a55)
-            # Use original word without boundaries on normalized content for better detection
-            if word_lower in normalized_content:
+            # Create regex that handles repeated characters (e.g. "ass" -> "a+s+s+")
+            fuzzy_pattern = r"".join([re.escape(c) + r'+' for c in word_lower])
+            
+            # Check for fuzzy/normalized match (detects bypasses like a55 and assssss)
+            if re.search(fuzzy_pattern, normalized_content):
                 return True, True # Fuzzy/Leet match, needs review
         
         return False, False
