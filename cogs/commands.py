@@ -6,6 +6,8 @@ import sys
 import asyncio
 import os
 import logging
+import platform
+import datetime
 from utils import owner_only, mod_only, command_help, HelpInfo, create_embed
 
 class HelpView(discord.ui.View):
@@ -220,6 +222,7 @@ class Commands(commands.Cog):
     
     def __init__(self, bot):
         self.bot: commands.Bot = bot
+        self.start_time = datetime.datetime.now(datetime.timezone.utc)
     
     # Core system commands (owner only)
     @command_help("owner", "Shuts down the bot completely", "shutdown")
@@ -356,6 +359,57 @@ class Commands(commands.Cog):
         """Check the bot's latency."""
         latency = round(self.bot.latency * 1000)
         await ctx.send(f"Pong! Latency: {latency}ms")
+
+    @command_help("general", "Show bot vitals, version, and info", "about")
+    @commands.hybrid_command(name="about", aliases=["vitals", "botinfo", "info"], description="Show bot vitals, version, and information")
+    async def about(self, ctx):
+        """Display information about the bot, its vitals, and its creator."""
+        uptime = datetime.datetime.now(datetime.timezone.utc) - self.start_time
+        
+        # Format uptime nicely
+        days = uptime.days
+        hours, remainder = divmod(uptime.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s" if days > 0 else f"{hours}h {minutes}m {seconds}s"
+        
+        # Get owner info
+        owner = self.bot.get_user(config.OWNER_ID)
+        owner_str = str(owner).replace("#0", "") if owner else f"User ID: {config.OWNER_ID}"
+        
+        embed = create_embed("Bot Vitals & Information")
+        if self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            
+        # Core Vitals
+        embed.add_field(
+            name="📊 Vitals", 
+            value=f"**Latency:** {round(self.bot.latency * 1000)}ms\n"
+                  f"**Uptime:** {uptime_str}\n"
+                  f"**Servers:** {len(self.bot.guilds)}\n"
+                  f"**Cached Users:** {len(self.bot.users)}", 
+            inline=False
+        )
+        
+        # System Info
+        embed.add_field(
+            name="💻 System Details", 
+            value=f"**Python:** v{platform.python_version()}\n"
+                  f"**Discord.py:** v{discord.__version__}\n"
+                  f"**OS:** {platform.system()} {platform.release()}\n"
+                  f"**Host:** {platform.node()}", 
+            inline=False
+        )
+        
+        # Ownership
+        embed.add_field(
+            name="👑 Ownership", 
+            value=f"**Owner:** {owner_str}\n"
+                  f"**Status:** Running perfectly fine! ✨", 
+            inline=False
+        )
+        
+        embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
+        await ctx.send(embed=embed)
 
 
     @command_help("general", "Display the server rules", "rules")
