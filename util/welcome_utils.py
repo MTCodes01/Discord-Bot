@@ -127,8 +127,8 @@ class WelcomeSystem:
                         avatar_img.paste(av_raw, (0, 0), av_mask)
                         
                         # Draw aesthetic white ring
-                        ring_width = max(2, int(HEIGHT * 0.015))
-                        ImageDraw.Draw(avatar_img).ellipse((ring_width//2, ring_width//2, ar*2 - ring_width//2, ar*2 - ring_width//2), outline=(255,255,255,255), width=ring_width)
+                        # ring_width = max(2, int(HEIGHT * 0.015))
+                        # ImageDraw.Draw(avatar_img).ellipse((ring_width//2, ring_width//2, ar*2 - ring_width//2, ar*2 - ring_width//2), outline=(255,255,255,255), width=ring_width)
             except Exception as e:
                 self.logger.error(f"Error downloading avatar: {str(e)}")
             
