@@ -1006,44 +1006,18 @@ class LevelingSystem:
             
             WIDTH, HEIGHT = 800, 280
             
-            # Create base image with transparent background
-            img = Image.new('RGBA', (WIDTH, HEIGHT), color=(0, 0, 0, 0))
-            draw = ImageDraw.Draw(img)
-            
             # Select Theme colors
             accent_color = member.color.to_rgb()
             if accent_color == (0, 0, 0):
                 accent_color = (114, 137, 218)
                 
             bg_base = (20, 22, 28, 255)
-            wave1 = (40, 25, 90, 255)
-            wave2 = (70, 30, 140, 255)
-            wave3 = (90, 40, 180, 255)
             
-            # Draw rounded card background base
+            # Create base image with transparent background
+            img = Image.new('RGBA', (WIDTH, HEIGHT), color=(0, 0, 0, 0))
+            
+            # Draw rounded card mask
             radius = 25
-            try:
-                draw.rounded_rectangle([(0, 0), (WIDTH, HEIGHT)], radius=radius, fill=bg_base)
-            except AttributeError:
-                draw.rectangle([(0, 0), (WIDTH, HEIGHT)], fill=bg_base)
-                
-            # Draw intersection bounding box for waves
-            wave_img = Image.new('RGBA', (WIDTH, HEIGHT), (0,0,0,0))
-            wave_draw = ImageDraw.Draw(wave_img)
-            
-            def draw_wave(draw_obj, w, h, base_y, amplitude, period, phase, fill):
-                points = [(0, h)]
-                for x in range(w + 1):
-                    y = base_y + math.sin((x + phase) * 2 * math.pi / period) * amplitude
-                    points.append((x, y))
-                points.append((w, h))
-                draw_obj.polygon(points, fill=fill)
-                
-            draw_wave(wave_draw, WIDTH, HEIGHT, base_y=70, amplitude=40, period=600, phase=300, fill=wave1)
-            draw_wave(wave_draw, WIDTH, HEIGHT, base_y=110, amplitude=50, period=500, phase=150, fill=wave2)
-            draw_wave(wave_draw, WIDTH, HEIGHT, base_y=160, amplitude=35, period=700, phase=50, fill=wave3)
-            
-            # Mask the waves strictly to the card's rounded bounds
             mask = Image.new("L", (WIDTH, HEIGHT), 0)
             mask_draw = ImageDraw.Draw(mask)
             try:
@@ -1051,7 +1025,30 @@ class LevelingSystem:
             except AttributeError:
                 mask_draw.rectangle([(0, 0), (WIDTH, HEIGHT)], fill=255)
                 
-            img.paste(wave_img, (0, 0), mask)
+            # Load background image
+            try:
+                import os
+                bg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "image.png")
+                bg_img = Image.open(bg_path).convert("RGBA")
+                # Resize and crop to fill the Width and Height
+                # If image is smaller, this scales it up
+                bg_w, bg_h = bg_img.size
+                scale = max(WIDTH/bg_w, HEIGHT/bg_h)
+                new_w, new_h = int(bg_w * scale), int(bg_h * scale)
+                bg_img = bg_img.resize((new_w, new_h))
+                # Crop center
+                left = (new_w - WIDTH) // 2
+                top = (new_h - HEIGHT) // 2
+                bg_img = bg_img.crop((left, top, left + WIDTH, top + HEIGHT))
+            except Exception as e:
+                self.logger.error(f"Error loading background image: {e}")
+                # Fallback to dark bg
+                bg_img = Image.new("RGBA", (WIDTH, HEIGHT), bg_base)
+                
+            # Paste background using mask for rounded corners
+            img.paste(bg_img, (0, 0), mask)
+            
+            draw = ImageDraw.Draw(img)
             
             # Left sidebar dark overlay
             try:
