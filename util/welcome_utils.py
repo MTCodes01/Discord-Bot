@@ -105,22 +105,6 @@ class WelcomeSystem:
             plate_x = (WIDTH - plate_w) // 2
             plate_y = (HEIGHT - plate_h) // 2
             
-            # Draw elegant translucent pill background
-            pill = Image.new("RGBA", (WIDTH, HEIGHT), (0,0,0,0))
-            ImageDraw.Draw(pill).rounded_rectangle(
-                [plate_x, plate_y, plate_x+plate_w, plate_y+plate_h], 
-                radius=plate_h//2, 
-                fill=(10, 15, 20, 150)  # Dark glassmorphism
-            )
-            
-            # Subtle inner stroke for the pill
-            ImageDraw.Draw(pill).rounded_rectangle(
-                [plate_x, plate_y, plate_x+plate_w, plate_y+plate_h], 
-                radius=plate_h//2, 
-                outline=(255, 255, 255, 40), width=int(2*scale_factor)
-            )
-            img.paste(pill, (0,0), pill)
-            
             # Avatar size perfectly fitted inside the left of the pill
             padding = int(plate_h * 0.1)
             ar = (plate_h - padding * 2) // 2
