@@ -1062,10 +1062,10 @@ class LevelingSystem:
             
             # Load fonts
             try:
-                title_font = ImageFont.truetype("arial.ttf", 46)
-                label_font = ImageFont.truetype("arialbd.ttf", 22)  # Bold format
-                num_font = ImageFont.truetype("arialbd.ttf", 36)
-                info_font = ImageFont.truetype("arial.ttf", 18)
+                title_font = ImageFont.truetype("arialbd.ttf", 56)
+                label_font = ImageFont.truetype("arialbd.ttf", 26)  # Bold format
+                num_font = ImageFont.truetype("arialbd.ttf", 46)
+                info_font = ImageFont.truetype("arial.ttf", 22)
             except Exception:
                 title_font = ImageFont.load_default()
                 label_font = ImageFont.load_default()
@@ -1109,7 +1109,10 @@ class LevelingSystem:
                 img.paste(avatar_img, (avatar_x, avatar_y), avatar_img)
                 
             # Top text: Username
-            draw.text((280, 25), member.display_name, fill=(255, 255, 255), font=title_font)
+            d_name = member.display_name
+            if len(d_name) > 16:
+                d_name = d_name[:14] + "..."
+            draw.text((280, 20), d_name, fill=(255, 255, 255), font=title_font)
             
             # Helper to draw progress bars
             def draw_stat_row(draw_obj, base_y, level, is_text, rank, total, curr, req):
