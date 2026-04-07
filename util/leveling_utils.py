@@ -1069,10 +1069,10 @@ class LevelingSystem:
                         continue
                 return ImageFont.load_default()
                 
-            title_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 56)
-            label_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 26)  # Bold format
-            num_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 46)
-            info_font = load_font(["arial.ttf", "LiberationSans-Regular.ttf"], 22)
+            title_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 36)
+            label_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 16)  # Bold format
+            num_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 28)
+            info_font = load_font(["arial.ttf", "LiberationSans-Regular.ttf"], 15)
             
             # Download avatar
             avatar_radius = 90
