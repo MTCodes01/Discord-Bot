@@ -100,15 +100,8 @@ class WelcomeSystem:
             # Scale variables
             scale_factor = min(WIDTH / 800, HEIGHT / 300)
             
-            plate_h = int(HEIGHT * 0.65)
-            plate_w = int(WIDTH * 0.8)
-            plate_x = (WIDTH - plate_w) // 2
-            plate_y = (HEIGHT - plate_h) // 2
-            
-            # Avatar size perfectly fitted inside the left of the pill
-            padding = int(plate_h * 0.1)
-            ar = (plate_h - padding * 2) // 2
-            ax, ay = plate_x + padding, plate_y + padding
+            ar = int(HEIGHT * 0.3)
+            ax, ay = int(WIDTH * 0.15), HEIGHT // 2 - ar
             
             # Download avatar
             avatar_img = None
@@ -127,6 +120,21 @@ class WelcomeSystem:
                         
                         avatar_img = Image.new("RGBA", (ar*2, ar*2))
                         avatar_img.paste(av_raw, (0, 0), av_mask)
+                        
+                        # Draw ethereal radial aura behind avatar
+                        aura = Image.new("RGBA", (WIDTH, HEIGHT), (0,0,0,0))
+                        aura_draw = ImageDraw.Draw(aura)
+                        aura_radius = int(ar * 1.5)
+                        for i in range(20):
+                            r = ar + (aura_radius - ar) * i // 20
+                            alpha = min(255, max(0, 50 - (2 * i)))
+                            aura_draw.ellipse((ax + ar - r, ay + ar - r, ax + ar + r, ay + ar + r), fill=(255, 255, 255, alpha))
+                        img.paste(aura, (0,0), aura)
+                        
+                        # Draw subtle clean rim
+                        ring_width = max(2, int(HEIGHT * 0.015))
+                        ImageDraw.Draw(avatar_img).ellipse((ring_width//2, ring_width//2, ar*2 - ring_width//2, ar*2 - ring_width//2), outline=(255,255,255,80), width=ring_width)
+                        
             except Exception as e:
                 self.logger.error(f"Error downloading avatar: {str(e)}")
             
@@ -134,10 +142,8 @@ class WelcomeSystem:
                 img.paste(avatar_img, (ax, ay), avatar_img)
             
             # Text placing
-            # We place the text symmetrically in the remaining space of the pill
-            text_area_x = ax + ar*2
-            text_area_w = plate_w - (ar*2 + padding)
-            text_x = text_area_x + text_area_w // 2
+            text_x = ax + ar*2 + int(WIDTH * 0.15)
+            text_y = HEIGHT // 2
             
             display_name = member.display_name
             username_txt = f"@{member.name}"
@@ -162,15 +168,15 @@ class WelcomeSystem:
             sub_font = load_font(["arial.ttf", "LiberationSans-Regular.ttf"], int(24 * scale_factor))
 
             # Greeting
-            draw_text_shadow(draw, greeting_txt, text_x, plate_y + plate_h // 2 - int(28*scale_factor), header_font, "mb", (245, 195, 105)) # Golden accent
+            draw_text_shadow(draw, greeting_txt, text_x, text_y - int(28*scale_factor), header_font, "mb", (245, 195, 105)) # Golden accent
             
             # Name
             if len(display_name) > 16:
                 display_name = display_name[:14] + '...'
-            draw_text_shadow(draw, display_name, text_x, plate_y + plate_h // 2 + int(10*scale_factor), title_font, "mb", (255, 255, 255))
+            draw_text_shadow(draw, display_name, text_x, text_y + int(10*scale_factor), title_font, "mb", (255, 255, 255))
             
             # Username
-            draw_text_shadow(draw, username_txt, text_x, plate_y + plate_h // 2 + int(18*scale_factor), sub_font, "mt", (200, 210, 220))
+            draw_text_shadow(draw, username_txt, text_x, text_y + int(18*scale_factor), sub_font, "mt", (200, 210, 220))
             
             buffer = BytesIO()
             img.save(buffer, format="PNG")
