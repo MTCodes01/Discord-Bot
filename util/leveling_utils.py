@@ -1061,16 +1061,18 @@ class LevelingSystem:
                 pass
             
             # Load fonts
-            try:
-                title_font = ImageFont.truetype("arialbd.ttf", 56)
-                label_font = ImageFont.truetype("arialbd.ttf", 26)  # Bold format
-                num_font = ImageFont.truetype("arialbd.ttf", 46)
-                info_font = ImageFont.truetype("arial.ttf", 22)
-            except Exception:
-                title_font = ImageFont.load_default()
-                label_font = ImageFont.load_default()
-                num_font = ImageFont.load_default()
-                info_font = ImageFont.load_default()
+            def load_font(font_names, size):
+                for name in font_names:
+                    try:
+                        return ImageFont.truetype(name, size)
+                    except Exception:
+                        continue
+                return ImageFont.load_default()
+                
+            title_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 56)
+            label_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 26)  # Bold format
+            num_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], 46)
+            info_font = load_font(["arial.ttf", "LiberationSans-Regular.ttf"], 22)
             
             # Download avatar
             avatar_radius = 90
