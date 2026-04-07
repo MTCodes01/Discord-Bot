@@ -97,16 +97,34 @@ class WelcomeSystem:
                         continue
                 return ImageFont.load_default()
                 
-            # Base text sizes dynamic to image height
-            # Assuming standard image is ~800x300. We scale font size based on image height.
+            # Scale variables
             scale_factor = min(WIDTH / 800, HEIGHT / 300)
             
-            title_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], int(50 * scale_factor))
-            sub_font = load_font(["arial.ttf", "LiberationSans-Regular.ttf"], int(26 * scale_factor))
+            plate_h = int(HEIGHT * 0.65)
+            plate_w = int(WIDTH * 0.8)
+            plate_x = (WIDTH - plate_w) // 2
+            plate_y = (HEIGHT - plate_h) // 2
             
-            # Avatar size proportional to image height
-            ar = int(HEIGHT * 0.3)
-            ax, ay = int(WIDTH * 0.1), HEIGHT // 2 - ar
+            # Draw elegant translucent pill background
+            pill = Image.new("RGBA", (WIDTH, HEIGHT), (0,0,0,0))
+            ImageDraw.Draw(pill).rounded_rectangle(
+                [plate_x, plate_y, plate_x+plate_w, plate_y+plate_h], 
+                radius=plate_h//2, 
+                fill=(10, 15, 20, 150)  # Dark glassmorphism
+            )
+            
+            # Subtle inner stroke for the pill
+            ImageDraw.Draw(pill).rounded_rectangle(
+                [plate_x, plate_y, plate_x+plate_w, plate_y+plate_h], 
+                radius=plate_h//2, 
+                outline=(255, 255, 255, 40), width=int(2*scale_factor)
+            )
+            img.paste(pill, (0,0), pill)
+            
+            # Avatar size perfectly fitted inside the left of the pill
+            padding = int(plate_h * 0.1)
+            ar = (plate_h - padding * 2) // 2
+            ax, ay = plate_x + padding, plate_y + padding
             
             # Download avatar
             avatar_img = None
@@ -118,45 +136,57 @@ class WelcomeSystem:
                         av_raw = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
                         av_raw = av_raw.resize((ar*2, ar*2))
                         
-                        # Apply circular mask instead of rounded square
+                        # Apply precise circular mask
                         av_mask = Image.new("L", (ar*2, ar*2), 0)
                         av_mask_draw = ImageDraw.Draw(av_mask)
                         av_mask_draw.ellipse((0, 0, ar*2, ar*2), fill=255)
                         
                         avatar_img = Image.new("RGBA", (ar*2, ar*2))
                         avatar_img.paste(av_raw, (0, 0), av_mask)
-                        
-                        # Draw aesthetic white ring
-                        # ring_width = max(2, int(HEIGHT * 0.015))
-                        # ImageDraw.Draw(avatar_img).ellipse((ring_width//2, ring_width//2, ar*2 - ring_width//2, ar*2 - ring_width//2), outline=(255,255,255,255), width=ring_width)
             except Exception as e:
                 self.logger.error(f"Error downloading avatar: {str(e)}")
             
             if avatar_img:
                 img.paste(avatar_img, (ax, ay), avatar_img)
             
-            # Positioning for text without the bulky box
-            box_x, box_y = ax + ar * 2 + int(WIDTH * 0.05), int(HEIGHT * 0.3)
-            box_w, box_h = int(WIDTH * 0.9) - box_x, int(HEIGHT * 0.4)
-            text_x = box_x + box_w // 2
+            # Text placing
+            # We place the text symmetrically in the remaining space of the pill
+            text_area_x = ax + ar*2
+            text_area_w = plate_w - (ar*2 + padding)
+            text_x = text_area_x + text_area_w // 2
             
             display_name = member.display_name
             username_txt = f"@{member.name}"
-            
-            # Adjust title for Leave
-            if not is_welcome:
-                display_name = f"Farewell, {display_name}"
+            greeting_txt = "WELCOME" if is_welcome else "FAREWELL"
             
             # Helper for text drop shadow
-            def draw_text_shadow(d, text, x, y, font, anchor, main_color, shadow_color=(0,0,0,230), offset=max(2, int(scale_factor*4))):
+            def draw_text_shadow(d, text, x, y, font, anchor, main_color, shadow_color=(0,0,0,230), offset=max(2, int(scale_factor*3))):
                 d.text((x + offset, y + offset), text, fill=shadow_color, font=font, anchor=anchor)
                 d.text((x, y), text, fill=main_color, font=font, anchor=anchor)
 
+            # Load special tiny font for header
+            def load_font(font_names, size):
+                for name in font_names:
+                    try:
+                        return ImageFont.truetype(name, size)
+                    except Exception:
+                        continue
+                return ImageFont.load_default()
+                
+            header_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], int(20 * scale_factor))
+            title_font = load_font(["arialbd.ttf", "LiberationSans-Bold.ttf"], int(46 * scale_factor))
+            sub_font = load_font(["arial.ttf", "LiberationSans-Regular.ttf"], int(24 * scale_factor))
+
+            # Greeting
+            draw_text_shadow(draw, greeting_txt, text_x, plate_y + plate_h // 2 - int(28*scale_factor), header_font, "mb", (245, 195, 105)) # Golden accent
+            
             # Name
-            draw_text_shadow(draw, display_name, text_x, box_y + box_h // 2 - int(10*scale_factor), title_font, "mb", (255, 255, 255))
+            if len(display_name) > 16:
+                display_name = display_name[:14] + '...'
+            draw_text_shadow(draw, display_name, text_x, plate_y + plate_h // 2 + int(10*scale_factor), title_font, "mb", (255, 255, 255))
             
             # Username
-            draw_text_shadow(draw, username_txt, text_x, box_y + box_h // 2 + int(10*scale_factor), sub_font, "mt", (220, 230, 240))
+            draw_text_shadow(draw, username_txt, text_x, plate_y + plate_h // 2 + int(18*scale_factor), sub_font, "mt", (200, 210, 220))
             
             buffer = BytesIO()
             img.save(buffer, format="PNG")
