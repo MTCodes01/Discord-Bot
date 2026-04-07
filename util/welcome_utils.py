@@ -101,7 +101,7 @@ class WelcomeSystem:
             scale_factor = min(WIDTH / 800, HEIGHT / 300)
             
             ar = int(HEIGHT * 0.3)
-            ax, ay = int(WIDTH * 0.15), HEIGHT // 2 - ar
+            ax, ay = int(WIDTH * 0.12), HEIGHT // 2 - ar  # Moved further left
             
             # Download avatar
             avatar_img = None
@@ -121,19 +121,19 @@ class WelcomeSystem:
                         avatar_img = Image.new("RGBA", (ar*2, ar*2))
                         avatar_img.paste(av_raw, (0, 0), av_mask)
                         
-                        # Draw ethereal radial aura behind avatar
+                        # Draw ethereal radial aura with smoother fade-out
                         aura = Image.new("RGBA", (WIDTH, HEIGHT), (0,0,0,0))
                         aura_draw = ImageDraw.Draw(aura)
-                        aura_radius = int(ar * 1.5)
-                        for i in range(20):
-                            r = ar + (aura_radius - ar) * i // 20
-                            alpha = min(255, max(0, 50 - (2 * i)))
-                            aura_draw.ellipse((ax + ar - r, ay + ar - r, ax + ar + r, ay + ar + r), fill=(255, 255, 255, alpha))
+                        aura_radius = int(ar * 1.8)
+                        for i in range(40):
+                            r = int(ar + (aura_radius - ar) * i / 40)
+                            # Softer edge fade
+                            alpha = int(40 * (1 - (i / 40)**1.5))
+                            if alpha > 0:
+                                aura_draw.ellipse((ax + ar - r, ay + ar - r, ax + ar + r, ay + ar + r), fill=(255, 255, 255, alpha))
                         img.paste(aura, (0,0), aura)
                         
-                        # Draw subtle clean rim
-                        ring_width = max(2, int(HEIGHT * 0.015))
-                        ImageDraw.Draw(avatar_img).ellipse((ring_width//2, ring_width//2, ar*2 - ring_width//2, ar*2 - ring_width//2), outline=(255,255,255,80), width=ring_width)
+                        # rim is removed per user's preference
                         
             except Exception as e:
                 self.logger.error(f"Error downloading avatar: {str(e)}")
@@ -141,8 +141,8 @@ class WelcomeSystem:
             if avatar_img:
                 img.paste(avatar_img, (ax, ay), avatar_img)
             
-            # Text placing
-            text_x = ax + ar*2 + int(WIDTH * 0.15)
+            # Text placing - increase offset to avoid overlap
+            text_x = ax + ar*2 + int(WIDTH * 0.22)
             text_y = HEIGHT // 2
             
             display_name = member.display_name
