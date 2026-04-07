@@ -970,100 +970,217 @@ class LevelingSystem:
             Discord file with rank card image or None if error
         """
         try:
-            # Get user data
-            user_data = await self.get_user_xp(member.id, member.guild.id)
+            # Load guild_data for direct rank calculations
+            guild_data = await self._load_guild_data(member.guild.id)
+            config = await self.get_config(member.guild.id)
+            level_curve = config["level_curve"]
             
-            if not user_data:
+            user_id_str = str(member.id)
+            if user_id_str not in guild_data:
                 return None
                 
-            # Get user rank
-            rank = await self.get_user_rank(member.id, member.guild.id)
+            u_data = guild_data[user_id_str]
+            text_xp = u_data.get("text_xp", 0)
+            voice_xp = u_data.get("voice_xp", 0)
             
-            # Create rank card image
-            WIDTH, HEIGHT = 800, 250
+            # Sort for ranks
+            users_text = [{"id": uid, "xp": d.get("text_xp", 0)} for uid, d in guild_data.items()]
+            users_text.sort(key=lambda x: x["xp"], reverse=True)
+            text_rank = next((i+1 for i, u in enumerate(users_text) if int(u["id"]) == member.id), 0)
             
-            # Create base image
-            img = Image.new('RGBA', (WIDTH, HEIGHT), color=(44, 47, 51, 255))
+            users_voice = [{"id": uid, "xp": d.get("voice_xp", 0)} for uid, d in guild_data.items()]
+            users_voice.sort(key=lambda x: x["xp"], reverse=True)
+            voice_rank = next((i+1 for i, u in enumerate(users_voice) if int(u["id"]) == member.id), 0)
+            
+            # Calculate levels for text and voice independently
+            text_level = self._calculate_level(text_xp, level_curve)
+            voice_level = self._calculate_level(voice_xp, level_curve)
+            
+            def get_xp_progress(curr_xp, level):
+                needed = self._calculate_xp_for_level(level + 1, level_curve)
+                prev = self._calculate_xp_for_level(level, level_curve)
+                return curr_xp - prev, needed - prev
+                
+            text_cur, text_req = get_xp_progress(text_xp, text_level)
+            voice_cur, voice_req = get_xp_progress(voice_xp, voice_level)
+            
+            WIDTH, HEIGHT = 800, 280
+            
+            # Create base image with transparent background
+            img = Image.new('RGBA', (WIDTH, HEIGHT), color=(0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
             
-            # Try to load fonts
+            # Select Theme colors
+            accent_color = member.color.to_rgb()
+            if accent_color == (0, 0, 0):
+                accent_color = (114, 137, 218)
+                
+            bg_base = (20, 22, 28, 255)
+            wave1 = (40, 25, 90, 255)
+            wave2 = (70, 30, 140, 255)
+            wave3 = (90, 40, 180, 255)
+            
+            # Draw rounded card background base
+            radius = 25
             try:
-                name_font = ImageFont.truetype("arial.ttf", 36)
-                level_font = ImageFont.truetype("arial.ttf", 32)
-                info_font = ImageFont.truetype("arial.ttf", 24)
+                draw.rounded_rectangle([(0, 0), (WIDTH, HEIGHT)], radius=radius, fill=bg_base)
+            except AttributeError:
+                draw.rectangle([(0, 0), (WIDTH, HEIGHT)], fill=bg_base)
+                
+            # Draw intersection bounding box for waves
+            wave_img = Image.new('RGBA', (WIDTH, HEIGHT), (0,0,0,0))
+            wave_draw = ImageDraw.Draw(wave_img)
+            
+            def draw_wave(draw_obj, w, h, base_y, amplitude, period, phase, fill):
+                points = [(0, h)]
+                for x in range(w + 1):
+                    y = base_y + math.sin((x + phase) * 2 * math.pi / period) * amplitude
+                    points.append((x, y))
+                points.append((w, h))
+                draw_obj.polygon(points, fill=fill)
+                
+            draw_wave(wave_draw, WIDTH, HEIGHT, base_y=70, amplitude=40, period=600, phase=300, fill=wave1)
+            draw_wave(wave_draw, WIDTH, HEIGHT, base_y=110, amplitude=50, period=500, phase=150, fill=wave2)
+            draw_wave(wave_draw, WIDTH, HEIGHT, base_y=160, amplitude=35, period=700, phase=50, fill=wave3)
+            
+            # Mask the waves strictly to the card's rounded bounds
+            mask = Image.new("L", (WIDTH, HEIGHT), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            try:
+                mask_draw.rounded_rectangle([(0, 0), (WIDTH, HEIGHT)], radius=radius, fill=255)
+            except AttributeError:
+                mask_draw.rectangle([(0, 0), (WIDTH, HEIGHT)], fill=255)
+                
+            img.paste(wave_img, (0, 0), mask)
+            
+            # Left sidebar dark overlay
+            try:
+                # Add transparency overlapping
+                sidebar_overlay = Image.new('RGBA', (WIDTH, HEIGHT), (0,0,0,0))
+                sd_draw = ImageDraw.Draw(sidebar_overlay)
+                sd_draw.ellipse([(-100, -100), (320, HEIGHT+100)], fill=(12, 14, 18, 230))
+                img.paste(sidebar_overlay, (0, 0), sidebar_overlay)
             except Exception:
-                # Fallback to default
-                name_font = ImageFont.load_default()
-                level_font = ImageFont.load_default()
+                pass
+            
+            # Load fonts
+            try:
+                title_font = ImageFont.truetype("arial.ttf", 46)
+                label_font = ImageFont.truetype("arialbd.ttf", 22)  # Bold format
+                num_font = ImageFont.truetype("arialbd.ttf", 36)
+                info_font = ImageFont.truetype("arial.ttf", 18)
+            except Exception:
+                title_font = ImageFont.load_default()
+                label_font = ImageFont.load_default()
+                num_font = ImageFont.load_default()
                 info_font = ImageFont.load_default()
             
             # Download avatar
-            avatar_size = 180
+            avatar_radius = 90
+            avatar_x, avatar_y = 50, HEIGHT // 2 - avatar_radius
             avatar_img = None
             
             try:
-                # Get avatar URL
                 avatar_url = member.display_avatar.url
-                
-                # Download avatar
                 async with self.bot.session.get(avatar_url) as resp:
                     if resp.status == 200:
                         avatar_bytes = await resp.read()
-                        avatar_img = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
-                        avatar_img = avatar_img.resize((avatar_size, avatar_size))
+                        av_raw = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
+                        av_raw = av_raw.resize((avatar_radius*2, avatar_radius*2))
                         
-                        # Create circular mask
-                        mask = Image.new("L", (avatar_size, avatar_size), 0)
-                        mask_draw = ImageDraw.Draw(mask)
-                        mask_draw.ellipse((0, 0, avatar_size, avatar_size), fill=255)
+                        av_mask = Image.new("L", (avatar_radius*2, avatar_radius*2), 0)
+                        av_mask_draw = ImageDraw.Draw(av_mask)
+                        av_mask_draw.ellipse((0, 0, avatar_radius*2, avatar_radius*2), fill=255)
                         
-                        # Apply mask
-                        circle_avatar = Image.new("RGBA", (avatar_size, avatar_size))
-                        circle_avatar.paste(avatar_img, (0, 0), mask)
-                        avatar_img = circle_avatar
-                        
+                        avatar_img = Image.new("RGBA", (avatar_radius*2, avatar_radius*2))
+                        avatar_img.paste(av_raw, (0, 0), av_mask)
             except Exception as e:
                 self.logger.error(f"Error downloading avatar: {str(e)}")
             
-            # Add avatar to card
+            # Draw avatar stroke
+            stroke_width = 4
+            try:
+                draw.ellipse(
+                    (avatar_x - stroke_width, avatar_y - stroke_width, 
+                     avatar_x + avatar_radius*2 + stroke_width, avatar_y + avatar_radius*2 + stroke_width),
+                    fill=(150, 160, 180)
+                )
+            except Exception:
+                pass
+
             if avatar_img:
-                img.paste(avatar_img, (30, 30), avatar_img)
-            
-            # Add background accent bar
-            accent_color = member.color.to_rgb()
-            if accent_color == (0, 0, 0):
-                accent_color = (114, 137, 218)  # Discord Blurple if no role color
+                img.paste(avatar_img, (avatar_x, avatar_y), avatar_img)
                 
-            # Add user info
-            draw.text((240, 40), member.display_name, fill=(255, 255, 255), font=name_font)
-            draw.text((240, 90), f"Level: {user_data['level']}", fill=accent_color, font=level_font)
-            draw.text((400, 90), f"Rank: #{rank}", fill=(114, 137, 218), font=level_font)
+            # Top text: Username
+            draw.text((280, 25), member.display_name, fill=(255, 255, 255), font=title_font)
             
-            # Add XP text
-            xp_text = f"XP: {user_data['total_xp']} / {user_data['current_level_xp']} of {user_data['xp_needed']} to next level"
-            draw.text((240, 140), xp_text, fill=(255, 255, 255), font=info_font)
+            # Helper to draw progress bars
+            def draw_stat_row(draw_obj, base_y, level, is_text, rank, total, curr, req):
+                # LVL text
+                draw_obj.text((280, base_y), "LVL", fill=(200, 200, 220), font=label_font, anchor="mm")
+                draw_obj.text((280, base_y+26), str(level), fill=(255, 255, 255), font=num_font, anchor="mm")
+                
+                # Icons
+                icon_x = 315
+                icon_y = base_y
+                if is_text:
+                    try:
+                        draw_obj.rounded_rectangle([(icon_x, icon_y-2), (icon_x+24, icon_y+16)], radius=4, fill=(220, 220, 220))
+                    except:
+                        draw_obj.rectangle([(icon_x, icon_y-2), (icon_x+24, icon_y+16)], fill=(220, 220, 220))
+                    draw_obj.polygon([(icon_x+5, icon_y+16), (icon_x+10, icon_y+16), (icon_x+5, icon_y+22)], fill=(220, 220, 220))
+                    draw_obj.ellipse((icon_x+4, icon_y+5, icon_x+7, icon_y+8), fill=(50,50,50))
+                    draw_obj.ellipse((icon_x+10, icon_y+5, icon_x+13, icon_y+8), fill=(50,50,50))
+                    draw_obj.ellipse((icon_x+16, icon_y+5, icon_x+19, icon_y+8), fill=(50,50,50))
+                else:
+                    try:
+                        draw_obj.rounded_rectangle([(icon_x+6, icon_y-3), (icon_x+14, icon_y+13)], radius=4, fill=(220,220,220))
+                    except:
+                        draw_obj.rectangle([(icon_x+6, icon_y-3), (icon_x+14, icon_y+13)], fill=(220,220,220))
+                    draw_obj.arc([(icon_x+3, icon_y+5), (icon_x+17, icon_y+19)], start=0, end=180, fill=(220,220,220), width=3)
+                    draw_obj.line([(icon_x+10, icon_y+19), (icon_x+10, icon_y+24)], fill=(220,220,220), width=3)
+                    draw_obj.line([(icon_x+5, icon_y+24), (icon_x+15, icon_y+24)], fill=(220,220,220), width=3)
+                
+                # Info text
+                bar_x = 360
+                draw_obj.text((bar_x, base_y-5), f"Rank: #{rank}", fill=(220, 220, 230), font=info_font)
+                draw_obj.text((760, base_y-5), f"Total: {total}", fill=(220, 220, 230), font=info_font, anchor="ra")
+                
+                # Progress bar
+                bar_w = 400
+                bar_h = 24
+                bar_y = base_y + 15
+                bar_radius = 12
+                
+                try:
+                    draw_obj.rounded_rectangle([(bar_x, bar_y), (bar_x+bar_w, bar_y+bar_h)], radius=bar_radius, fill=(30, 30, 35, 180), outline=(150, 150, 160), width=2)
+                except AttributeError:
+                    draw_obj.rectangle([(bar_x, bar_y), (bar_x+bar_w, bar_y+bar_h)], fill=(30, 30, 35, 180))
+                    
+                # Fill
+                pct = curr / req if req > 0 else 0
+                pct = min(1.0, max(0.0, pct))
+                prog = int(bar_w * pct)
+                if prog > bar_radius * 2:
+                    try:
+                        draw_obj.rounded_rectangle([(bar_x+2, bar_y+2), (bar_x+prog-2, bar_y+bar_h-2)], radius=bar_radius-2, fill=(200, 210, 230, 255))
+                    except AttributeError:
+                        draw_obj.rectangle([(bar_x+2, bar_y+2), (bar_x+prog-2, bar_y+bar_h-2)], fill=(200, 210, 230, 255))
+                
+                # Center text inside bar
+                draw_obj.text((bar_x + bar_w//2, bar_y + bar_h//2), f"{curr} / {req}", fill=(255, 255, 255) if pct < 0.5 else (20, 20, 20), font=info_font, anchor="mm")
+
+            # Draw Text Row
+            draw_stat_row(draw, 100, text_level, True, text_rank, text_xp, text_cur, text_req)
             
-            # Draw XP progress bar background
-            bar_width = 520
-            bar_height = 25
-            bar_x = 240
-            bar_y = 180
-            draw.rectangle([(bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height)], fill=(80, 80, 80))
-            
-            # Draw XP progress bar
-            progress_width = int(bar_width * (user_data['progress'] / 100))
-            draw.rectangle([(bar_x, bar_y), (bar_x + progress_width, bar_y + bar_height)], fill=accent_color)
-            
-            # Add percentage text
-            percent_text = f"{user_data['progress']:.1f}%"
-            draw.text((bar_x + bar_width // 2, bar_y + 1), percent_text, fill=(255, 255, 255), font=info_font, anchor="mt")
+            # Draw Voice Row
+            draw_stat_row(draw, 190, voice_level, False, voice_rank, voice_xp, voice_cur, voice_req)
             
             # Save image to bytes
             buffer = BytesIO()
             img.save(buffer, format="PNG")
             buffer.seek(0)
             
-            # Create file
             return discord.File(buffer, filename="rank_card.png")
             
         except Exception as e:
