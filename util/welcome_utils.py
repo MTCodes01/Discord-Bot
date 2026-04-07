@@ -118,38 +118,26 @@ class WelcomeSystem:
                         av_raw = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
                         av_raw = av_raw.resize((ar*2, ar*2))
                         
-                        # Apply rounded square mask
+                        # Apply circular mask instead of rounded square
                         av_mask = Image.new("L", (ar*2, ar*2), 0)
                         av_mask_draw = ImageDraw.Draw(av_mask)
-                        av_mask_draw.rounded_rectangle((0, 0, ar*2, ar*2), radius=int(ar*0.3), fill=255)
+                        av_mask_draw.ellipse((0, 0, ar*2, ar*2), fill=255)
                         
                         avatar_img = Image.new("RGBA", (ar*2, ar*2))
                         avatar_img.paste(av_raw, (0, 0), av_mask)
+                        
+                        # Draw aesthetic white ring
+                        ring_width = max(2, int(HEIGHT * 0.015))
+                        ImageDraw.Draw(avatar_img).ellipse((ring_width//2, ring_width//2, ar*2 - ring_width//2, ar*2 - ring_width//2), outline=(255,255,255,255), width=ring_width)
             except Exception as e:
                 self.logger.error(f"Error downloading avatar: {str(e)}")
             
             if avatar_img:
-                # Add a subtle dark glow behind avatar
-                shadow_rect = [ax-4, ay-4, ax+ar*2+4, ay+ar*2+4]
-                try:
-                    draw.rounded_rectangle(shadow_rect, radius=int(ar*0.3), fill=(0,0,0,100))
-                except:
-                    pass
                 img.paste(avatar_img, (ax, ay), avatar_img)
             
-            # Draw semi-transparent box for text
+            # Positioning for text without the bulky box
             box_x, box_y = ax + ar * 2 + int(WIDTH * 0.05), int(HEIGHT * 0.3)
             box_w, box_h = int(WIDTH * 0.9) - box_x, int(HEIGHT * 0.4)
-            
-            try:
-                # Try rounded rectangle box
-                overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0,0,0,0))
-                ImageDraw.Draw(overlay).rounded_rectangle([box_x, box_y, box_x+box_w, box_y+box_h], radius=int(HEIGHT*0.05), fill=(20, 20, 25, 180))
-                img.paste(overlay, (0,0), overlay)
-            except:
-                pass
-            
-            # Text placing
             text_x = box_x + box_w // 2
             
             display_name = member.display_name
@@ -159,11 +147,16 @@ class WelcomeSystem:
             if not is_welcome:
                 display_name = f"Farewell, {display_name}"
             
+            # Helper for text drop shadow
+            def draw_text_shadow(d, text, x, y, font, anchor, main_color, shadow_color=(0,0,0,230), offset=max(2, int(scale_factor*4))):
+                d.text((x + offset, y + offset), text, fill=shadow_color, font=font, anchor=anchor)
+                d.text((x, y), text, fill=main_color, font=font, anchor=anchor)
+
             # Name
-            draw.text((text_x, box_y + box_h // 2 - int(10*scale_factor)), display_name, fill=(255, 255, 255), font=title_font, anchor="mb")
+            draw_text_shadow(draw, display_name, text_x, box_y + box_h // 2 - int(10*scale_factor), title_font, "mb", (255, 255, 255))
             
             # Username
-            draw.text((text_x, box_y + box_h // 2 + int(10*scale_factor)), username_txt, fill=(180, 190, 200), font=sub_font, anchor="mt")
+            draw_text_shadow(draw, username_txt, text_x, box_y + box_h // 2 + int(10*scale_factor), sub_font, "mt", (220, 230, 240))
             
             buffer = BytesIO()
             img.save(buffer, format="PNG")
