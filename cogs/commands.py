@@ -274,16 +274,17 @@ class Commands(commands.Cog):
         Scope 'guild' syncs only to the current server (immediate).
         No scope syncs globally (takes up to an hour).
         """
+        await ctx.defer(ephemeral=True)
         try:
             if scope == "guild" or scope == "local":
                 synced = await self.bot.tree.sync(guild=ctx.guild)
-                await ctx.send(f"Synced {len(synced)} application commands to **this guild**.")
+                await ctx.send(f"Synced {len(synced)} application commands to **this guild**.", ephemeral=True)
             else:
                 synced = await self.bot.tree.sync()
-                await ctx.send(f"Synced {len(synced)} application commands **globally**.")
+                await ctx.send(f"Synced {len(synced)} application commands **globally**.", ephemeral=True)
         except Exception as e:
-            await ctx.send(f"Failed to sync application commands: {e}")
-        await ctx.send("Application command sync completed!")
+            await ctx.send(f"Failed to sync application commands: {e}", ephemeral=True)
+
     
     @command_help("owner", "Set the bot's status", "status [status]")
     @owner_only()
