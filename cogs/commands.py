@@ -265,13 +265,14 @@ class Commands(commands.Cog):
 
         await message.edit(content="✅ All cogs have been reloaded successfully!")
 
-    @command_help("owner", "Syncs application commands (slash commands)", "sync [guild]")
+    @command_help("owner", "Syncs application commands (slash commands)", "sync [scope]")
     @owner_only()
     @commands.hybrid_command(name="sync", description="Syncs application commands (slash commands)")
     async def sync(self, ctx, scope: str = None):
         """Sync application commands (slash commands).
         
-        Scope 'guild' syncs only to the current server (immediate).
+        Scope 'guild' syncs global commands to the current server (immediate).
+        Scope 'clear' removes server-specific commands to fix duplicates.
         No scope syncs globally (takes up to an hour).
         """
         await ctx.defer(ephemeral=True)
@@ -280,6 +281,10 @@ class Commands(commands.Cog):
                 self.bot.tree.copy_global_to(guild=ctx.guild)
                 synced = await self.bot.tree.sync(guild=ctx.guild)
                 await ctx.send(f"Synced {len(synced)} application commands to **this guild**.", ephemeral=True)
+            elif scope == "clear":
+                self.bot.tree.clear_commands(guild=ctx.guild)
+                await self.bot.tree.sync(guild=ctx.guild)
+                await ctx.send("Cleared all guild-specific application commands to fix duplicates.", ephemeral=True)
             else:
                 synced = await self.bot.tree.sync()
                 await ctx.send(f"Synced {len(synced)} application commands **globally**.", ephemeral=True)
