@@ -485,5 +485,55 @@ class Commands(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @command_help(
+        category="mod",
+        description="Send a direct message to a user from the bot",
+        usage="dm <user> <message>",
+        examples=["dm @User Hello there!", "dm 123456789 Your report has been reviewed."],
+        note="The target user must share a server with the bot and have DMs open."
+    )
+    @mod_only()
+    @commands.hybrid_command(name="dm", description="Send a direct message to a user from the bot")
+    async def dm(self, ctx, user: discord.Member, *, message: str):
+        """Send a direct message to a specified user from the bot."""
+        # Build the DM embed
+        dm_embed = create_embed(
+            title="📬 Message from the Server",
+            description=message
+        )
+        dm_embed.add_field(
+            name="Sent by",
+            value=f"{ctx.author.display_name} ({ctx.guild.name if ctx.guild else 'Direct'})",
+            inline=False
+        )
+        dm_embed.set_footer(
+            text="This is an official message from the server staff.",
+            icon_url=ctx.guild.icon.url if ctx.guild and ctx.guild.icon else None
+        )
+
+        try:
+            await user.send(embed=dm_embed)
+        except discord.Forbidden:
+            await ctx.send(
+                f"❌ Could not send a DM to **{user.display_name}**. "
+                "They may have DMs disabled or have blocked the bot.",
+                ephemeral=True
+            )
+            return
+        except discord.HTTPException as e:
+            await ctx.send(f"❌ Failed to send DM: {e}", ephemeral=True)
+            return
+
+        # Confirm to the moderator (ephemeral so it stays clean in the channel)
+        confirm_embed = create_embed(
+            title="✅ DM Sent",
+            description=f"Your message was successfully delivered to **{user.display_name}**."
+        )
+        confirm_embed.add_field(name="📝 Message", value=message, inline=False)
+        confirm_embed.set_footer(text=f"Sent by {ctx.author}", icon_url=ctx.author.display_avatar.url)
+        await ctx.send(embed=confirm_embed, ephemeral=True)
+
+
 async def setup(bot):
     await bot.add_cog(Commands(bot))
+
