@@ -493,32 +493,50 @@ class Commands(commands.Cog):
         await ctx.send(embed=embed)
 
     @command_help(
-        category="mod",
+        category="general",
         description="Send a direct message to a user from the bot",
         usage="dm <user> <message>",
         examples=["dm @User Hello there!", "dm 123456789 Your report has been reviewed."],
         note="The target user must share a server with the bot and have DMs open."
     )
-    @mod_only()
     @commands.hybrid_command(name="dm", description="Send a direct message to a user from the bot")
-    @app_commands.describe(user="The user to send a DM to", message="The plain text message to send")
+    @app_commands.describe(user="The user to send a DM to", message="The message to send")
     async def dm(self, ctx, user: discord.User, *, message: str):
         """Send a direct message to a specified user from the bot."""
-        await ctx.defer()
+        await ctx.defer(ephemeral=True)
+        
+        # Check if the sender is a mod or owner
+        is_mod = False
+        if ctx.author.id == config.OWNER_ID:
+            is_mod = True
+        elif ctx.guild and any(role.id in config.MOD_ROLES for role in ctx.author.roles):
+            is_mod = True
+
         try:
-            await user.send(message)
+            if is_mod:
+                # Send as plain text (anonymous) for mods
+                await user.send(message)
+            else:
+                # Send as embed with sender details for normal users
+                embed = create_embed(title="New Direct Message", description=message)
+                embed.set_author(name=f"Message from {ctx.author.display_name}", icon_url=ctx.author.display_avatar.url)
+                if ctx.guild:
+                    embed.set_footer(text=f"Sent via {ctx.guild.name}")
+                await user.send(embed=embed)
+                
         except discord.Forbidden:
             await ctx.send(
                 f"❌ Could not send a DM to **{user.display_name}**. "
-                "They may have DMs disabled or have blocked the bot."
+                "They may have DMs disabled or have blocked the bot.",
+                ephemeral=True
             )
             return
         except discord.HTTPException as e:
-            await ctx.send(f"❌ Failed to send DM: {e}")
+            await ctx.send(f"❌ Failed to send DM: {e}", ephemeral=True)
             return
 
-        # Confirm to the moderator
-        await ctx.send(f"✅ Message successfully sent to **{user.display_name}**: {message}")
+        # Confirm to the sender
+        await ctx.send(f"✅ Message successfully sent to **{user.display_name}**.", ephemeral=True)
 
 
 
