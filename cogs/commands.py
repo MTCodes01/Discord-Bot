@@ -277,6 +277,7 @@ class Commands(commands.Cog):
         await ctx.defer(ephemeral=True)
         try:
             if scope == "guild" or scope == "local":
+                self.bot.tree.copy_global_to(guild=ctx.guild)
                 synced = await self.bot.tree.sync(guild=ctx.guild)
                 await ctx.send(f"Synced {len(synced)} application commands to **this guild**.", ephemeral=True)
             else:
