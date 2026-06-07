@@ -12,4 +12,5 @@ services:
     volumes:
       - ./data:/app/data
       - ./backups:/app/backups
+      - ./logs:/app/logs
       # - .:/app  # Optional: map whole repo for development live-reload
