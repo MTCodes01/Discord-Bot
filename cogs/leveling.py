@@ -609,7 +609,7 @@ class Leveling(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="dm", description="Enable or disable sending level up messages via DM")
-    async def dm(self, ctx, enabled: bool):
+    async def levelconfig_dm(self, ctx, enabled: bool):
         """Configure DM level up messages"""
         await ctx.defer()
         
