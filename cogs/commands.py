@@ -498,21 +498,22 @@ class Commands(commands.Cog):
     @app_commands.describe(user="The user to send a DM to", message="The plain text message to send")
     async def dm(self, ctx, user: discord.User, *, message: str):
         """Send a direct message to a specified user from the bot."""
+        await ctx.defer()
         try:
             await user.send(message)
         except discord.Forbidden:
             await ctx.send(
                 f"❌ Could not send a DM to **{user.display_name}**. "
-                "They may have DMs disabled or have blocked the bot.",
-                ephemeral=True
+                "They may have DMs disabled or have blocked the bot."
             )
             return
         except discord.HTTPException as e:
-            await ctx.send(f"❌ Failed to send DM: {e}", ephemeral=True)
+            await ctx.send(f"❌ Failed to send DM: {e}")
             return
 
-        # Confirm to the moderator (ephemeral so it stays clean in the channel)
-        await ctx.send(f"✅ Message successfully sent to **{user.display_name}**: {message}", ephemeral=True)
+        # Confirm to the moderator
+        await ctx.send(f"✅ Message successfully sent to **{user.display_name}**: {message}")
+
 
 
 
