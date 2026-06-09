@@ -382,11 +382,15 @@ class ServerLogging(commands.Cog):
             self.logger.info(f"[Guild: {member.guild.name}] Voice state update for: {member}")
 
             # Check audit logs for moves/disconnects
+            # Note: for member_move, Discord sets entry.target=None and stores channel in entry.extra.channel
+            # So we cannot filter by user/channel ID — we just grab the most recent entry
             executor = None
             if before.channel and not after.channel:
+                # Disconnect: target is the member being disconnected
                 executor = await self.get_audit_log_executor(member.guild, discord.AuditLogAction.member_disconnect, member.id)
             elif before.channel and after.channel and before.channel != after.channel:
-                executor = await self.get_audit_log_executor(member.guild, discord.AuditLogAction.member_move, member.id)
+                # Move: target is None in Discord's audit log, just get the most recent move entry
+                executor = await self.get_audit_log_executor(member.guild, discord.AuditLogAction.member_move, target_id=None)
 
             # Create embed
             embed = LogEmbed.voice_state_update(member, before, after, executor=executor)
