@@ -24,15 +24,20 @@ class ServerLogging(commands.Cog):
         """Initialize logging system when bot is ready"""
         self.logger.info("Logging system initialized")
     
-    async def get_audit_log_executor(self, guild, action, target_id=None):
+    async def get_audit_log_executor(self, guild, action, target_id=None, retries=3):
         if not guild.me.guild_permissions.view_audit_log:
             return None
         try:
-            await asyncio.sleep(1.0)
-            async for entry in guild.audit_logs(action=action, limit=5):
-                if (discord.utils.utcnow() - entry.created_at).total_seconds() < 10:
-                    if target_id is None or (hasattr(entry.target, 'id') and entry.target.id == target_id) or entry.target == target_id:
-                        return entry.user
+            for _ in range(retries):
+                await asyncio.sleep(1.0)
+                async for entry in guild.audit_logs(action=action, limit=10):
+                    if (discord.utils.utcnow() - entry.created_at).total_seconds() < 15:
+                        if target_id is None or (hasattr(entry.target, 'id') and entry.target.id == target_id) or entry.target == target_id:
+                            return entry.user
+                        
+                        # Handle mass-moves (Discord sets target to None when moving a whole channel)
+                        if action == discord.AuditLogAction.member_move and entry.target is None:
+                            return entry.user
         except Exception:
             pass
         return None
