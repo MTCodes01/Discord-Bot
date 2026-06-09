@@ -157,7 +157,7 @@ class LogEmbed:
         return embed
     
     @staticmethod
-    def member_update(before, after):
+    def member_update(before, after, executor=None):
         """Create an embed for a member update event"""
         embed = discord.Embed(
             title="👤 Member Updated",
@@ -190,6 +190,10 @@ class LogEmbed:
         
         # Add member info
         embed.add_field(name="Member", value=f"{after} ({after.id})", inline=True)
+        
+        # Add executor info if available and not the user themselves
+        if executor and executor.id != after.id:
+            embed.add_field(name="Updated By", value=f"{executor.mention} ({executor.id})", inline=False)
         
         # Add member thumbnail
         if after.avatar:
@@ -433,7 +437,7 @@ class LogEmbed:
         return embed
     
     @staticmethod
-    def voice_state_update(member, before, after):
+    def voice_state_update(member, before, after, executor=None):
         """Create an embed for a voice state update event"""
         # Determine the action
         if not before.channel and after.channel:
@@ -455,13 +459,19 @@ class LogEmbed:
             color=color
         )
         
-        # Set description based on action
+        # Set description based on action and executor
         if action == "joined":
             embed.description = f"{member.mention} joined voice channel {after.channel.mention}"
         elif action == "left":
-            embed.description = f"{member.mention} left voice channel {before.channel.mention}"
+            if executor and executor.id != member.id:
+                embed.description = f"{member.mention} was disconnected from voice channel {before.channel.mention} by {executor.mention}"
+            else:
+                embed.description = f"{member.mention} left voice channel {before.channel.mention}"
         elif action == "moved":
-            embed.description = f"{member.mention} moved from {before.channel.mention} to {after.channel.mention}"
+            if executor and executor.id != member.id:
+                embed.description = f"{member.mention} was moved from {before.channel.mention} to {after.channel.mention} by {executor.mention}"
+            else:
+                embed.description = f"{member.mention} moved from {before.channel.mention} to {after.channel.mention}"
             
         # Add member info
         embed.add_field(name="Member", value=f"{member} ({member.id})", inline=True)

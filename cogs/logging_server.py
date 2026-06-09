@@ -179,8 +179,13 @@ class ServerLogging(commands.Cog):
         try:
             self.logger.info(f"[Guild: {after.guild.name}] Member updated: {after}")
 
+            # If roles changed, check audit logs for who did it
+            executor = None
+            if before.roles != after.roles:
+                executor = await self.get_audit_log_executor(after.guild, discord.AuditLogAction.member_role_update, after.id)
+
             # Create embed
-            embed = LogEmbed.member_update(before, after)
+            embed = LogEmbed.member_update(before, after, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(after.guild, "member-log", embed)
@@ -371,8 +376,15 @@ class ServerLogging(commands.Cog):
         try:
             self.logger.info(f"[Guild: {member.guild.name}] Voice state update for: {member}")
 
+            # Check audit logs for moves/disconnects
+            executor = None
+            if before.channel and not after.channel:
+                executor = await self.get_audit_log_executor(member.guild, discord.AuditLogAction.member_disconnect, member.id)
+            elif before.channel and after.channel and before.channel != after.channel:
+                executor = await self.get_audit_log_executor(member.guild, discord.AuditLogAction.member_move, member.id)
+
             # Create embed
-            embed = LogEmbed.voice_state_update(member, before, after)
+            embed = LogEmbed.voice_state_update(member, before, after, executor=executor)
             
             # Log to appropriate channel
             await self.logging_system.log_event(member.guild, "voice-log", embed)
