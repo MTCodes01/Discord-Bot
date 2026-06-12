@@ -9,6 +9,10 @@ import traceback
 import copy
 import config
 
+from .profanity.config import ProfanityConfig
+from .profanity.detector import ProfanityDetector
+from .profanity.logger import ProfanityLogger
+from .profanity.review_system import ModeratorReviewSystem
 
 class AutoModerationSystem:
     """Core system for server auto-moderation functionality"""
@@ -99,10 +103,13 @@ class AutoModerationSystem:
         self.recent_messages = {}
         self.recent_mentions = {}
         
-        # Load default bad words list
-        self.default_bad_words = self._load_default_bad_words()
+        # Setup profanity subsystem
+        self.profanity_config = ProfanityConfig(self.data_dir)
+        self.profanity_detector = ProfanityDetector(self.profanity_config)
+        self.profanity_logger = ProfanityLogger(self.bot)
+        self.review_system = ModeratorReviewSystem(self.bot, self.profanity_config)
         
-        # Leet-speak replacement mapping
+        # Leet-speak replacement mapping (kept for other potential uses)
         self.leet_mapping = {
             '4': 'a', '@': 'a', '8': 'b', '3': 'e', '1': 'i', '!': 'i', '0': 'o', 
             '5': 's', '$': 's', '7': 't', '9': 'g', '2': 'z', '6': 'g', 'z': 's'
@@ -382,13 +389,25 @@ class AutoModerationSystem:
         # 4. Bad words filter (includes normalization/fuzzy detection as requested)
         words_config = config["modules"]["bad_words"]
         if words_config.get("enabled", False):
-            found, review_needed = await self._check_bad_words(message, words_config)
-            if found:
-                violations.append("bad_words")
-                total_strikes += words_config.get("strikes", 1)
-                primary_action = "strike"
-                if review_needed:
-                    needs_review = True
+            result = self.profanity_detector.analyze(message.content)
+            if result.is_profane:
+                log_channel_id = config.get("log_channel_id")
+                
+                # Context Logging (for all detections >= 70)
+                if result.confidence >= 70:
+                    await self.profanity_logger.log_detection(message, result, log_channel_id)
+                
+                if result.confidence >= 95:
+                    violations.append("bad_words")
+                    total_strikes += words_config.get("strikes", 1)
+                    primary_action = "strike"
+                elif result.confidence >= 85:
+                    violations.append("bad_words")
+                    total_strikes += words_config.get("strikes", 1)
+                    primary_action = "strike"
+                elif result.confidence >= 70:
+                    # Send for moderator review queue (below auto-delete threshold)
+                    await self.review_system.send_for_review(message, result, log_channel_id)
                 
         # 5. Anti-invite
         invite_config = config["modules"].get("anti_invite", {})
@@ -539,49 +558,7 @@ class AutoModerationSystem:
         
         return False
     
-    async def _check_bad_words(self, message: discord.Message, config: Dict[str, Any]) -> Tuple[bool, bool]:
-        """Check for bad words
-        
-        Returns:
-            Tuple of (found, review_needed)
-        """
-        # Skip if empty message
-        if not message.content:
-            return False, False
-            
-        # Get word lists
-        default_words = self.default_bad_words
-        custom_words = config.get("custom_words", [])
-        
-        # Combine lists
-        bad_words = set(custom_words)
-        bad_words.update(config.get("words", []))
-        
-        # Also include global default words if configured to do so
-        # or if no other words are defined
-        if not bad_words or config.get("use_defaults", True):
-            bad_words.update(default_words)
-        
-        # Normalize message content
-        content = message.content.lower()
-        normalized_content = self._normalize_content(message.content)
-        
-        # Check for bad words
-        for word in bad_words:
-            word_lower = word.lower()
-            # Check for word boundaries in original content
-            pattern = r'\b' + re.escape(word_lower) + r'\b'
-            if re.search(pattern, content):
-                return True, False # Exact match, no review needed
-                
-            # Create regex that handles repeated characters (e.g. "ass" -> "a+s+s+")
-            fuzzy_pattern = r"".join([re.escape(c) + r'+' for c in word_lower])
-            
-            # Check for fuzzy/normalized match (detects bypasses like a55 and assssss)
-            if re.search(fuzzy_pattern, normalized_content):
-                return True, True # Fuzzy/Leet match, needs review
-        
-        return False, False
+        return False
         
     async def _check_invites(self, message: discord.Message, config: Dict[str, Any]) -> bool:
         if not message.content:
