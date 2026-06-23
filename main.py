@@ -76,6 +76,13 @@ async def setup_hook():
     except Exception as e:
         logger.error(f"Failed to load extensions: {e}")
 
+    try:
+        from util.profanity.review_system import ReviewView
+        bot.add_view(ReviewView())
+        logger.info("Registered persistent views")
+    except Exception as e:
+        logger.error(f"Failed to register persistent views: {e}")
+
 bot.setup_hook = setup_hook
 
 # Bot events

@@ -4,13 +4,10 @@ from .detector import DetectionResult
 from .config import ProfanityConfig
 
 class ReviewView(discord.ui.View):
-    def __init__(self, message: discord.Message, result: DetectionResult, config: ProfanityConfig):
-        super().__init__(timeout=86400) # 24 hour timeout
-        self.message = message
-        self.result = result
-        self.config = config
+    def __init__(self):
+        super().__init__(timeout=None)
 
-    @discord.ui.button(label="Approve (Safe)", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="Approve (Safe)", style=discord.ButtonStyle.green, custom_id="profanity_approve")
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         # When approved, we could optionally add to whitelist, but for now just log it
         await interaction.response.send_message("Message marked as safe. The detector will learn from this in the future.", ephemeral=True)
@@ -26,14 +23,27 @@ class ReviewView(discord.ui.View):
             
         await interaction.message.edit(embed=embed, view=self)
 
-    @discord.ui.button(label="Reject (Delete)", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="Reject (Delete)", style=discord.ButtonStyle.red, custom_id="profanity_reject")
     async def reject_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Delete the original message if it still exists
-        try:
-            await self.message.delete()
-            delete_status = "Message deleted."
-        except Exception:
-            delete_status = "Could not delete message (already deleted or missing permissions)."
+        embed = interaction.message.embeds[0]
+        channel_id_str = ""
+        msg_id_str = ""
+        for field in embed.fields:
+            if field.name == "Channel":
+                channel_id_str = field.value.strip("<#>")
+            elif field.name == "Message ID":
+                msg_id_str = field.value
+
+        delete_status = "Original message could not be found."
+        if channel_id_str and msg_id_str:
+            try:
+                channel = interaction.guild.get_channel(int(channel_id_str))
+                if channel:
+                    msg = await channel.fetch_message(int(msg_id_str))
+                    await msg.delete()
+                    delete_status = "Message deleted."
+            except Exception:
+                delete_status = "Could not delete message (already deleted or missing permissions)."
 
         await interaction.response.send_message(f"Message rejected. {delete_status}", ephemeral=True)
         
@@ -72,6 +82,8 @@ class ModeratorReviewSystem:
         
         embed.add_field(name="User", value=f"{message.author.mention} ({message.author.id})", inline=True)
         embed.add_field(name="Channel", value=f"{message.channel.mention}", inline=True)
+        embed.add_field(name="Message ID", value=str(message.id), inline=True)
+        
         embed.add_field(name="Confidence", value=f"{result.confidence}/100", inline=True)
         
         embed.add_field(name="Matched Word", value=f"`{result.matched_word}`", inline=True)
@@ -80,7 +92,7 @@ class ModeratorReviewSystem:
         orig_text = result.original_text[:1020] + "..." if len(result.original_text) > 1024 else result.original_text
         embed.add_field(name="Original Message", value=f"```\n{orig_text}\n```", inline=False)
         
-        view = ReviewView(message, result, self.config)
+        view = ReviewView()
         
         try:
             await channel.send(embed=embed, view=view)
