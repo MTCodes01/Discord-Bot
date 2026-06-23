@@ -17,7 +17,7 @@ class ProfanityConfig:
             "pass", "grass", "glass", "mass", "bass", "classic", 
             "analyze", "title", "button", "document", "assignment",
             "country", "count", "this", "that", "they", "them", "what",
-            "with", "from", "have", "good", "there"
+            "with", "from", "have", "good", "there", "cant", "cannot", "can't"
         }
         
         # Confidence Thresholds

@@ -10,7 +10,7 @@ class ReviewView(discord.ui.View):
         self.result = result
         self.config = config
 
-    @discord.ui.button(label="Approve (Safe)", style=discord.ButtonStyle.green, custom_id="profanity_approve")
+    @discord.ui.button(label="Approve (Safe)", style=discord.ButtonStyle.green)
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         # When approved, we could optionally add to whitelist, but for now just log it
         await interaction.response.send_message("Message marked as safe. The detector will learn from this in the future.", ephemeral=True)
@@ -26,7 +26,7 @@ class ReviewView(discord.ui.View):
             
         await interaction.message.edit(embed=embed, view=self)
 
-    @discord.ui.button(label="Reject (Delete)", style=discord.ButtonStyle.red, custom_id="profanity_reject")
+    @discord.ui.button(label="Reject (Delete)", style=discord.ButtonStyle.red)
     async def reject_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Delete the original message if it still exists
         try:

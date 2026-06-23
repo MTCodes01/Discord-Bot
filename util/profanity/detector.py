@@ -18,12 +18,16 @@ class ProfanityDetector:
     def __init__(self, config: ProfanityConfig):
         self.config = config
 
-    def analyze(self, text: str) -> DetectionResult:
+    def analyze(self, text: str, extra_bad_words: List[str] = None) -> DetectionResult:
         """
         Analyzes text for profanity and returns a DetectionResult.
         """
         if not text:
             return DetectionResult(False, self.config.CONFIDENCE_SAFE, None, None, text, "")
+
+        all_bad_words = self.config.bad_words
+        if extra_bad_words:
+            all_bad_words = all_bad_words.union([w.lower() for w in extra_bad_words])
 
         # 1. URL Handling - Extract and strip URLs
         clean_text, urls = URLHandler.extract_and_strip_urls(text)
@@ -55,7 +59,7 @@ class ProfanityDetector:
             if word in self.config.whitelist:
                 continue
                 
-            if word in self.config.bad_words:
+            if word in all_bad_words:
                 update_best(self.config.CONFIDENCE_EXACT, word, "Exact Match")
                 break # 100 confidence, can't get higher
 
@@ -72,7 +76,7 @@ class ProfanityDetector:
             
         compressed_text = TextNormalizer.compress_text(obfuscation_text)
         
-        for bad_word in self.config.bad_words:
+        for bad_word in all_bad_words:
             if bad_word in compressed_text:
                 # To be safe against very short bad words matching random letter combinations,
                 # we only trigger obfuscation for words >= 3 chars.
@@ -91,7 +95,7 @@ class ProfanityDetector:
             if collapsed_word in self.config.whitelist:
                 continue
 
-            for bad_word in self.config.bad_words:
+            for bad_word in all_bad_words:
                 # Only compare words of similar length to prevent excessive CPU usage and false positives
                 if abs(len(collapsed_word) - len(bad_word)) <= 2:
                     score = fuzz.ratio(collapsed_word, bad_word)

@@ -389,7 +389,7 @@ class AutoModerationSystem:
         # 4. Bad words filter (includes normalization/fuzzy detection as requested)
         words_config = config["modules"]["bad_words"]
         if words_config.get("enabled", False):
-            result = self.profanity_detector.analyze(message.content)
+            result = self.profanity_detector.analyze(message.content, words_config.get("custom_words", []))
             if result.is_profane:
                 log_channel_id = config.get("log_channel_id")
                 
