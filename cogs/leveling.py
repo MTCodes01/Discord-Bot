@@ -224,8 +224,12 @@ class Leveling(commands.Cog):
     
     @command_help("general", "View the server XP leaderboard", "leaderboard [page] [afk]")
     @commands.hybrid_command(name="leaderboard", aliases=["lb"], description="View the server leaderboard")
+    @app_commands.describe(
+        page="Page number to view (default: 1)",
+        afk="Show the inactive VC time leaderboard instead of XP"
+    )
     @commands.guild_only()
-    async def leaderboard(self, ctx, page: int = 1, afk: Optional[bool] = None):
+    async def leaderboard(self, ctx, page: int = 1, afk: bool = False):
         """Show server leaderboard"""
         await ctx.defer()
         
