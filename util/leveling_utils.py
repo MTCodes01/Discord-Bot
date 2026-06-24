@@ -712,9 +712,9 @@ class LevelingSystem:
             session = self.voice_sessions[session_key]
             
             # Calculate duration
-            start_time = session["start_time"]
+            last_update = session["last_update"]
             end_time = datetime.datetime.now().timestamp()
-            duration_seconds = end_time - start_time
+            duration_seconds = end_time - last_update
             
             # Get config
             config = await self.get_config(member.guild.id)
