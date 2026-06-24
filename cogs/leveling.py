@@ -222,10 +222,10 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error showing rank: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to show rank information.")
     
-    @command_help("general", "View the server XP leaderboard", "leaderboard [page]")
+    @command_help("general", "View the server XP leaderboard", "leaderboard [page] [afk]")
     @commands.hybrid_command(name="leaderboard", aliases=["lb"], description="View the server leaderboard")
     @commands.guild_only()
-    async def leaderboard(self, ctx, page: int = 1):
+    async def leaderboard(self, ctx, page: int = 1, afk: Optional[bool] = None):
         """Show server leaderboard"""
         await ctx.defer()
         
@@ -240,8 +240,11 @@ class Leveling(commands.Cog):
             # Calculate offset
             offset = (page - 1) * per_page
             
+            # Determine leaderboard mode
+            show_afk = afk is True
+
             # Get leaderboard data
-            leaderboard_data = await self.leveling.get_leaderboard(ctx.guild.id, per_page, offset)
+            leaderboard_data = await self.leveling.get_leaderboard(ctx.guild.id, per_page, offset, afk=show_afk)
             
             if not leaderboard_data or not leaderboard_data["leaderboard"]:
                 await ctx.send("No XP data found for this server.")
@@ -252,10 +255,17 @@ class Leveling(commands.Cog):
             total_pages = (total_users + per_page - 1) // per_page
             
             # Create embed
+            if show_afk:
+                embed_title = f"😴 {ctx.guild.name} Inactive VC Leaderboard"
+                embed_description = f"Top {per_page} users by AFK/inactive time in VC - Page {page}/{total_pages}"
+            else:
+                embed_title = f"🏆 {ctx.guild.name} Leaderboard"
+                embed_description = f"Top {per_page} users by XP - Page {page}/{total_pages}"
+
             embed = discord.Embed(
-                title=f"🏆 {ctx.guild.name} Leaderboard",
-                description=f"Top {per_page} users by XP - Page {page}/{total_pages}",
-                color=discord.Color.gold()
+                title=embed_title,
+                description=embed_description,
+                color=discord.Color.blurple() if show_afk else discord.Color.gold()
             )
             
             # Add server icon
@@ -292,7 +302,11 @@ class Leveling(commands.Cog):
                     rank_emoji = f"#{rank}"
                 
                 # Create entry
-                leaderboard_text += f"{rank_emoji} **{username}** - Level {entry['level']} ({entry['total_xp']} XP)\n"
+                if show_afk:
+                    afk_duration = self._format_duration(entry.get("afk_time", 0))
+                    leaderboard_text += f"{rank_emoji} **{username}** - {afk_duration} inactive (Level {entry['level']})\n"
+                else:
+                    leaderboard_text += f"{rank_emoji} **{username}** - Level {entry['level']} ({entry['total_xp']} XP)\n"
             
             # Add leaderboard entries as a field instead of setting description
             # This prevents the 1024 character limit error in embeds
@@ -300,13 +314,30 @@ class Leveling(commands.Cog):
             
             # Add page navigation guide
             if total_pages > 1:
-                embed.set_footer(text=f"Use /leaderboard [page] to view other pages • {total_users} total users")
+                if show_afk:
+                    embed.set_footer(text=f"Use /leaderboard [page] afk:True to view other pages • {total_users} total users")
+                else:
+                    embed.set_footer(text=f"Use /leaderboard [page] to view other pages • {total_users} total users • Use afk:True to view the inactive VC leaderboard")
             
             await ctx.send(embed=embed)
             
         except Exception as e:
             self.logger.error(f"Error showing leaderboard: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to show the leaderboard.")
+    
+    @staticmethod
+    def _format_duration(seconds: int) -> str:
+        """Format a duration in seconds to a human-readable string (e.g. 1h 23m 45s)"""
+        hours, remainder = divmod(int(seconds), 3600)
+        minutes, secs = divmod(remainder, 60)
+        parts = []
+        if hours:
+            parts.append(f"{hours}h")
+        if minutes:
+            parts.append(f"{minutes}m")
+        if secs or not parts:
+            parts.append(f"{secs}s")
+        return " ".join(parts)
     
     # === Admin Commands ===
     

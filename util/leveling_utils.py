@@ -262,6 +262,7 @@ class LevelingSystem:
                 "total_messages": user_data.get("message_count", 0),
                 "total_voice_seconds": voice_seconds,
                 "total_voice_minutes": voice_minutes,
+                "afk_seconds": user_data.get("afk_time", 0),
                 "last_message_time": user_data.get("last_message_time", 0)
             }
             
@@ -464,13 +465,14 @@ class LevelingSystem:
             self.logger.error(f"Error getting user rank: {str(e)}\n{traceback.format_exc()}")
             return 0
     
-    async def get_leaderboard(self, guild_id: int, limit: int = 10, offset: int = 0) -> Dict[str, Any]:
+    async def get_leaderboard(self, guild_id: int, limit: int = 10, offset: int = 0, afk: bool = False) -> Dict[str, Any]:
         """Get the server leaderboard
         
         Args:
             guild_id: The Discord guild ID
             limit: Number of entries to return
             offset: Offset from top of leaderboard
+            afk: If True, sort by voice XP instead of total XP (AFK/voice leaderboard)
             
         Returns:
             Dictionary with leaderboard data and total user count
@@ -490,6 +492,7 @@ class LevelingSystem:
                 text_xp = data.get("text_xp", 0)
                 voice_xp = data.get("voice_xp", 0)
                 total_xp = text_xp + voice_xp
+                afk_time = data.get("afk_time", 0)
                 level = self._calculate_level(total_xp, level_curve)
                 
                 users.append({
@@ -497,11 +500,13 @@ class LevelingSystem:
                     "text_xp": text_xp,
                     "voice_xp": voice_xp,
                     "total_xp": total_xp,
+                    "afk_time": afk_time,
                     "level": level
                 })
                 
-            # Sort by XP (descending)
-            users.sort(key=lambda u: u["total_xp"], reverse=True)
+            # Sort by AFK/inactive time or total XP depending on mode
+            sort_key = "afk_time" if afk else "total_xp"
+            users.sort(key=lambda u: u[sort_key], reverse=True)
             
             # Apply pagination
             total_users = len(users)
@@ -717,8 +722,11 @@ class LevelingSystem:
             # Calculate XP
             voice_xp = await self._calculate_voice_xp(member, session, duration_seconds, config)
             
-            # Update user data with voice time and XP
-            if voice_xp > 0:
+            # Check if this session counts as AFK/inactive time
+            is_inactive = self._is_inactive_session(member, session)
+
+            # Update user data with voice time, XP, and AFK time
+            if voice_xp > 0 or is_inactive:
                 # Load guild data
                 guild_data = await self._load_guild_data(member.guild.id)
                 
@@ -731,6 +739,7 @@ class LevelingSystem:
                         "voice_xp": 0,
                         "message_count": 0,
                         "voice_time": 0,
+                        "afk_time": 0,
                         "last_message_time": 0
                     }
                     
@@ -741,6 +750,10 @@ class LevelingSystem:
                 
                 # Update voice XP
                 user_data["voice_xp"] = user_data.get("voice_xp", 0) + voice_xp
+
+                # Update AFK/inactive time
+                if is_inactive:
+                    user_data["afk_time"] = user_data.get("afk_time", 0) + int(duration_seconds)
                 
                 # Save data
                 self.user_data[member.guild.id] = guild_data
@@ -793,8 +806,11 @@ class LevelingSystem:
             # Calculate XP
             voice_xp = await self._calculate_voice_xp(member, session, duration_seconds, config)
             
-            # Update user data with voice time and XP
-            if voice_xp > 0:
+            # Check if this session counts as AFK/inactive time
+            is_inactive = self._is_inactive_session(member, session)
+
+            # Update user data with voice time, XP, and AFK time
+            if voice_xp > 0 or is_inactive:
                 # Load guild data
                 guild_data = await self._load_guild_data(member.guild.id)
                 
@@ -807,6 +823,7 @@ class LevelingSystem:
                         "voice_xp": 0,
                         "message_count": 0,
                         "voice_time": 0,
+                        "afk_time": 0,
                         "last_message_time": 0
                     }
                     
@@ -817,6 +834,10 @@ class LevelingSystem:
                 
                 # Update voice XP
                 user_data["voice_xp"] = user_data.get("voice_xp", 0) + voice_xp
+
+                # Update AFK/inactive time
+                if is_inactive:
+                    user_data["afk_time"] = user_data.get("afk_time", 0) + int(duration_seconds)
                 
                 # Save data
                 self.user_data[member.guild.id] = guild_data
@@ -879,6 +900,32 @@ class LevelingSystem:
             self.logger.error(f"Error calculating voice XP: {str(e)}\n{traceback.format_exc()}")
             return 0
     
+    def _is_inactive_session(self, member: discord.Member, session: Dict[str, Any]) -> bool:
+        """Check if a voice session counts as AFK/inactive time.
+        
+        A session is inactive when the user is:
+        - In Discord's built-in AFK state (moved to AFK channel by Discord)
+        - In the guild's designated AFK voice channel
+        - Self-muted or self-deafened (not actively participating)
+        
+        Args:
+            member: The Discord member
+            session: Voice session tracking data
+            
+        Returns:
+            True if the session should be counted as AFK/inactive time
+        """
+        # Discord-native AFK flag (auto-moved to AFK channel)
+        if session.get("afk", False):
+            return True
+        # In the guild's designated AFK voice channel
+        if member.guild.afk_channel and session.get("channel_id") == member.guild.afk_channel.id:
+            return True
+        # Self-muted or self-deafened (inactive in VC)
+        if session.get("self_mute", False) or session.get("self_deaf", False):
+            return True
+        return False
+
     async def process_level_rewards(self, member: discord.Member, new_level: int) -> None:
         """Process rewards for a level up
         
