@@ -17,7 +17,7 @@ class ClearMessages(commands.Cog):
         """Initialize when bot is ready"""
         self.logger.info("Message clearing commands initialized")
     
-    @command_help("mod", "Clear messages from the channel", "clear [count]",
+    @command_help("moderation", "Clear messages from the channel", "clear [count]",
                  examples=["clear 10", "clear 50"],
                  note="Can clear up to 100 messages at once. Messages older than 14 days cannot be bulk-deleted due to Discord limitations.")
     @commands.guild_only()
@@ -89,7 +89,7 @@ class ClearMessages(commands.Cog):
             self.logger.error(f"[Bulk Delete Exception] {e}")
             await ctx.send("❌ An unexpected error occurred while deleting messages.", ephemeral=True)
     
-    @command_help("mod", "Clear messages from a specific user", "clearuser [user] [count]",
+    @command_help("moderation", "Clear messages from a specific user", "clearuser [user] [count]",
                  examples=["clearuser @username 20", "clearuser 123456789012345678 50"],
                  note="Can clear up to 100 messages at once. Messages older than 14 days cannot be bulk-deleted.")
     @commands.guild_only()
