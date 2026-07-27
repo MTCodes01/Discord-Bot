@@ -1,7 +1,7 @@
 # Bot configuration
 
 # Bot token (keep this private!)
-TOKEN = "YOUR_BOT_TOKEN_HERE"
+TOKEN = "_xE1iGT-uRBH4MQnZOmAZW8tLKpCKd6eIt4gLj0QmG24BMPgIo00A2IIuiA7cEB5"
 
 # Command prefix
 PREFIX = ">" # Change this to your desired prefix
