@@ -9,7 +9,13 @@ def owner_only():
     """Decorator that restricts command usage to the bot owner only."""
     async def predicate(ctx):
         return ctx.author.id == config.OWNER_ID
-    return commands.check(predicate)
+    
+    def decorator(func):
+        # Tag the function or command object so command_help can see it
+        actual_func = getattr(func, "callback", func)
+        actual_func.__requires_owner__ = True
+        return commands.check(predicate)(func)
+    return decorator
 
 def mod_only():
     """Decorator that restricts command usage to server moderators or bot owner."""
@@ -19,7 +25,13 @@ def mod_only():
         if not ctx.guild:
             return False
         return any(role.id in config.MOD_ROLES for role in ctx.author.roles)
-    return commands.check(predicate)
+        
+    def decorator(func):
+        # Tag the function or command object so command_help can see it
+        actual_func = getattr(func, "callback", func)
+        actual_func.__requires_mod__ = True
+        return commands.check(predicate)(func)
+    return decorator
 
 # Help formatting utilities
 class HelpInfo:
@@ -27,7 +39,7 @@ class HelpInfo:
     _commands = {}
     
     @classmethod
-    def add_command(cls, category, name, description, usage=None, examples=None, note=None):
+    def add_command(cls, category, name, description, usage=None, examples=None, note=None, requires_mod=False, requires_owner=False):
         """Register a command's help information."""
         if category not in cls._commands:
             cls._commands[category] = []
@@ -36,7 +48,9 @@ class HelpInfo:
             "description": description,
             "usage": usage,
             "examples": examples or [],
-            "note": note
+            "note": note,
+            "requires_mod": requires_mod,
+            "requires_owner": requires_owner
         })
     
     @classmethod
@@ -54,22 +68,21 @@ class HelpInfo:
         return None, None
 
 def command_help(category, description, usage=None, examples=None, note=None):
-    """Decorator to add help documentation to a command.
-    
-    Args:
-        category: The command category ("general", "mod", "owner")
-        description: Description of what the command does
-        usage: How to use the command (format and parameters)
-        examples: List of example usages of the command
-        note: Additional notes or warnings about the command
-    """
+    """Decorator to add help documentation to a command."""
     def decorator(func):
         # If this is a command object (like HybridCommand), get its callback
         actual_func = getattr(func, "callback", func)
 
         cmd_name = getattr(actual_func, "__name__", "unknown")
+        
+        # Check if the function was tagged by our permission decorators
+        requires_mod = getattr(actual_func, "__requires_mod__", False)
+        requires_owner = getattr(actual_func, "__requires_owner__", False)
 
-        HelpInfo.add_command(category, cmd_name, description, usage, examples, note)
+        HelpInfo.add_command(
+            category, cmd_name, description, usage, examples, note,
+            requires_mod=requires_mod, requires_owner=requires_owner
+        )
 
         # Store help info on the actual callable
         actual_func.help_info = {
@@ -78,7 +91,9 @@ def command_help(category, description, usage=None, examples=None, note=None):
             "description": description,
             "usage": usage,
             "examples": examples or [],
-            "note": note
+            "note": note,
+            "requires_mod": requires_mod,
+            "requires_owner": requires_owner
         }
 
         @functools.wraps(actual_func)

@@ -58,29 +58,12 @@ class HelpView(discord.ui.View):
         }
         return emojis.get(category, "📁")
 
-    def is_category_allowed(self, category, is_mod, is_owner):
-        """Helper to check if a user can see a specific category"""
-        owner_only_categories = ["owner", "backup"]
-        mod_only_categories = ["mod", "server_management", "moderation", "logging"]
-        
-        if category in owner_only_categories and not is_owner:
-            return False
-        if category in mod_only_categories and not (is_mod or is_owner):
-            return False
-        return True
-
     def create_category_select(self):
         """Create the category selection dropdown"""
         options = [discord.SelectOption(label="All Commands", value="all", emoji="📋", default=True)]
         
-        is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
-        is_owner = self.ctx.author.id == config.OWNER_ID
-
         for category, cmds in self.commands_by_category.items():
             if not cmds:
-                continue
-            
-            if not self.is_category_allowed(category, is_mod, is_owner):
                 continue
 
             label = f"{category.replace('_', ' ').title()} Commands"
@@ -126,21 +109,13 @@ class HelpView(discord.ui.View):
     
     def get_visible_commands(self):
         """Get list of commands visible to the user based on selected category"""
-        is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
-        is_owner = self.ctx.author.id == config.OWNER_ID
-        
         if self.current_category == "all":
             visible_commands = []
             for category, cmds in self.commands_by_category.items():
-                if not self.is_category_allowed(category, is_mod, is_owner):
-                    continue
                 visible_commands.extend(cmds)
             return visible_commands
         else:
-            category = self.current_category
-            if not self.is_category_allowed(category, is_mod, is_owner):
-                return []
-            return self.commands_by_category.get(category, [])
+            return self.commands_by_category.get(self.current_category, [])
     
     def get_embed(self):
         """Generate the help embed for the current page and category"""
@@ -324,8 +299,28 @@ class Commands(commands.Cog):
             # Show all commands with pagination and category selection
             commands_by_category = HelpInfo.get_all_commands()
             
+            # Filter commands asynchronously based on actual permissions
+            filtered_commands = {}
+            for cat, cmds in commands_by_category.items():
+                visible_cmds = []
+                for cmd in cmds:
+                    bot_cmd = self.bot.get_command(cmd["name"].split()[0])
+                    if not bot_cmd:
+                        # Fallback if command not found
+                        visible_cmds.append(cmd)
+                        continue
+                    
+                    try:
+                        if await bot_cmd.can_run(ctx):
+                            visible_cmds.append(cmd)
+                    except commands.CommandError:
+                        pass
+                
+                if visible_cmds:
+                    filtered_commands[cat] = visible_cmds
+            
             # Create the paginated help view
-            view = HelpView(ctx, commands_by_category)
+            view = HelpView(ctx, filtered_commands)
             
             # Send the initial embed with the view
             await ctx.send(embed=view.get_embed(), view=view)
