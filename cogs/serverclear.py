@@ -20,7 +20,7 @@ class ServerCleaner(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_command(name="clearchannel", description="Clear a specific channel")
-    @command_help("mod", "Delete and recreate a specific channel", "clearchannel [channel]", 
+    @command_help("server_management", "Delete and recreate a specific channel", "clearchannel [channel]", 
                 examples=["clearchannel #general", "clearchannel 123456789012345678"],
                 note="This will delete the channel and recreate it with the same permissions.")
     async def clear_channel(self, ctx, channel: discord.TextChannel = None):
@@ -105,7 +105,7 @@ class ServerCleaner(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_command(name="clearcategory", description="Clear all channels in a category")
-    @command_help("mod", "Delete all channels in a category", "clearcategory [category]", 
+    @command_help("server_management", "Delete all channels in a category", "clearcategory [category]", 
                 examples=["clearcategory \"General\"", "clearcategory 123456789012345678"],
                 note="This will delete all channels in the category but keep the category itself.")
     async def clear_category(self, ctx, *, category_name: str = None):
@@ -208,7 +208,7 @@ class ServerCleaner(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_command(name="clearserver", description="Clear all channels and categories in the server")
-    @command_help("mod", "Delete all channels and categories except setup", "clearserver", 
+    @command_help("server_management", "Delete all channels and categories except setup", "clearserver", 
                 examples=["clearserver"],
                 note="This will delete ALL channels and categories except for a text channel named 'setup'. If no setup channel exists, it will create one.")
     async def clear_server(self, ctx):

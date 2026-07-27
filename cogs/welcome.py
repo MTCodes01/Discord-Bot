@@ -103,7 +103,7 @@ class Welcome(commands.Cog):
 
     # --- Moderation Setup Commands ---
     
-    @command_help("mod", "Configure the Welcome and Leave systems", "welcomeconfig")
+    @command_help("server_management", "Configure the Welcome and Leave systems", "welcomeconfig")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_group(name="welcomeconfig", fallback="show", description="Configure the Welcome and Leave systems")
@@ -112,7 +112,7 @@ class Welcome(commands.Cog):
         await ctx.defer()
         await ctx.send("Available commands: `toggle`, `setchannel`, `setdata`, `test`")
 
-    @command_help("mod", "Toggle the welcome or leave system on/off", "welcomeconfig toggle <system> <enabled>")
+    @command_help("server_management", "Toggle the welcome or leave system on/off", "welcomeconfig toggle <system> <enabled>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @welcomeconfig.command(name="toggle", description="Toggle the welcome or leave system on/off")
@@ -128,7 +128,7 @@ class Welcome(commands.Cog):
         await self.welcome_system.save_config(ctx.guild.id, config)
         await ctx.send(f"✅ Turned **{system}** system {'ON' if enabled else 'OFF'}.")
 
-    @command_help("mod", "Set the channel where welcome/leave messages are sent", "welcomeconfig setchannel <system> <channel>")
+    @command_help("server_management", "Set the channel where welcome/leave messages are sent", "welcomeconfig setchannel <system> <channel>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @welcomeconfig.command(name="setchannel", description="Set the channel where welcome/leave messages are sent")
@@ -144,7 +144,7 @@ class Welcome(commands.Cog):
         await self.welcome_system.save_config(ctx.guild.id, config)
         await ctx.send(f"✅ Set **{system}** alerts to post in {channel.mention}.")
 
-    @command_help("mod", "Map data channels (rules, xp, announcements)", "welcomeconfig setdata <data_type> [channel]")
+    @command_help("server_management", "Map data channels (rules, xp, announcements)", "welcomeconfig setdata <data_type> [channel]")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @welcomeconfig.command(name="setdata", description="Map data channels (rules, xp, announcements)")
@@ -164,7 +164,7 @@ class Welcome(commands.Cog):
         else:
             await ctx.send(f"✅ Un-mapped the **{data_type}** data field.")
 
-    @command_help("mod", "Test the welcome or leave message manually", "welcomeconfig test [system]")
+    @command_help("server_management", "Test the welcome or leave message manually", "welcomeconfig test [system]")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @welcomeconfig.command(name="test", description="Test the welcome or leave message in the current channel")

@@ -44,25 +44,44 @@ class HelpView(discord.ui.View):
         self.next_button.callback = self.on_next
         self.add_item(self.next_button)
         
+    def get_category_emoji(self, category):
+        emojis = {
+            "owner": "🔒",
+            "mod": "🛡️",
+            "general": "📝",
+            "leveling": "⭐",
+            "quiz": "❓",
+            "logging": "📄",
+            "backup": "💾",
+            "server_management": "⚙️",
+            "moderation": "🔨"
+        }
+        return emojis.get(category, "📁")
+
     def create_category_select(self):
         """Create the category selection dropdown"""
-        # Create options based on available categories
         options = [discord.SelectOption(label="All Commands", value="all", emoji="📋", default=True)]
         
-        # Add owner commands if user is owner
-        if self.ctx.author.id == config.OWNER_ID and self.commands_by_category["owner"]:
-            options.append(discord.SelectOption(label="Owner Commands", value="owner", emoji="🔒"))
-            
-        # Add mod commands if user is mod or owner
         is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
-        if (is_mod or self.ctx.author.id == config.OWNER_ID) and self.commands_by_category["mod"]:
-            options.append(discord.SelectOption(label="Moderator Commands", value="mod", emoji="🛡️"))
+        is_owner = self.ctx.author.id == config.OWNER_ID
+
+        for category, cmds in self.commands_by_category.items():
+            if not cmds:
+                continue
             
-        # Add general commands option
-        if self.commands_by_category["general"]:
-            options.append(discord.SelectOption(label="General Commands", value="general", emoji="📝"))
+            if category == "owner" and not is_owner:
+                continue
+                
+            if category == "mod" and not (is_mod or is_owner):
+                continue
+
+            label = f"{category.replace('_', ' ').title()} Commands"
+            emoji = self.get_category_emoji(category)
+            options.append(discord.SelectOption(label=label, value=category, emoji=emoji))
             
-        # Create the select menu
+        # Discord allows max 25 options
+        options = options[:25]
+            
         select = discord.ui.Select(
             placeholder="Select command category",
             options=options
@@ -73,9 +92,7 @@ class HelpView(discord.ui.View):
     async def on_category_select(self, interaction):
         """Handle category selection"""
         self.current_category = interaction.data["values"][0]
-        self.current_page = 0  # Reset to first page when changing category
-        
-        # Update button states
+        self.current_page = 0
         await self.update_view(interaction)
     
     async def on_previous(self, interaction):
@@ -90,11 +107,8 @@ class HelpView(discord.ui.View):
     
     async def update_view(self, interaction):
         """Update the view and embed"""
-        # Update button states
         self.previous_button.disabled = (self.current_page == 0)
         self.next_button.disabled = (self.current_page >= self.get_total_pages() - 1)
-        
-        # Update the message
         await interaction.response.edit_message(embed=self.get_embed(), view=self)
     
     def get_total_pages(self):
@@ -104,95 +118,62 @@ class HelpView(discord.ui.View):
     
     def get_visible_commands(self):
         """Get list of commands visible to the user based on selected category"""
+        is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
+        is_owner = self.ctx.author.id == config.OWNER_ID
+        
         if self.current_category == "all":
-            # Combine all accessible categories
             visible_commands = []
-            
-            # Add owner commands if user is owner
-            if self.ctx.author.id == config.OWNER_ID:
-                visible_commands.extend(self.commands_by_category.get("owner", []))
-                
-            # Add mod commands if user is mod or owner
-            is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
-            if is_mod or self.ctx.author.id == config.OWNER_ID:
-                visible_commands.extend(self.commands_by_category.get("mod", []))
-                
-            # Add general commands (accessible to everyone)
-            visible_commands.extend(self.commands_by_category.get("general", []))
-            
+            for category, cmds in self.commands_by_category.items():
+                if category == "owner" and not is_owner:
+                    continue
+                if category == "mod" and not (is_mod or is_owner):
+                    continue
+                visible_commands.extend(cmds)
             return visible_commands
         else:
-            # Return only the selected category if the user has permission to view it
             category = self.current_category
-            
-            if category == "owner" and self.ctx.author.id != config.OWNER_ID:
+            if category == "owner" and not is_owner:
                 return []
-                
-            if category == "mod":
-                is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
-                if not is_mod and self.ctx.author.id != config.OWNER_ID:
-                    return []
-                    
+            if category == "mod" and not (is_mod or is_owner):
+                return []
             return self.commands_by_category.get(category, [])
     
     def get_embed(self):
         """Generate the help embed for the current page and category"""
         if self.current_category == "all":
             title = "Bot Commands Help"
-        elif self.current_category == "owner":
-            title = "🔒 Owner Commands"
-        elif self.current_category == "mod":
-            title = "🛡️ Moderator Commands"
         else:
-            title = "📝 General Commands"
+            emoji = self.get_category_emoji(self.current_category)
+            title = f"{emoji} {self.current_category.replace('_', ' ').title()} Commands"
             
         embed = create_embed(title)
         
-        # Get the commands for this category and page
         commands_list = self.get_visible_commands()
-        
-        # Calculate pagination
         start_idx = self.current_page * self.items_per_page
         end_idx = min(start_idx + self.items_per_page, len(commands_list))
         
-        # Generate command list text
         if not commands_list:
             embed.description = "No commands available in this category."
         else:
             page_commands = commands_list[start_idx:end_idx]
             
-            # If showing all categories, group by category
             if self.current_category == "all":
-                # Group commands by category
-                by_category = {"owner": [], "mod": [], "general": []}
-                
+                by_category = {}
                 for cmd in page_commands:
-                    for cat in ["owner", "mod", "general"]:
-                        if cmd in self.commands_by_category.get(cat, []):
+                    for cat, cmds in self.commands_by_category.items():
+                        if cmd in cmds:
+                            if cat not in by_category:
+                                by_category[cat] = []
                             by_category[cat].append(cmd)
                             break
                 
-                # Add owner commands field if any
-                if by_category["owner"] and self.ctx.author.id == config.OWNER_ID:
-                    owner_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
-                                          for cmd in by_category["owner"]])
-                    embed.add_field(name="🔒 Owner Commands", value=owner_text, inline=False)
-                    
-                # Add mod commands field if any
-                if by_category["mod"]:
-                    mod_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
-                                        for cmd in by_category["mod"]])
-                    embed.add_field(name="🛡️ Moderator Commands", value=mod_text, inline=False)
-                    
-                # Add general commands field if any
-                if by_category["general"]:
-                    general_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
-                                            for cmd in by_category["general"]])
-                    embed.add_field(name="📝 General Commands", value=general_text, inline=False)
+                for cat, cmds in by_category.items():
+                    emoji = self.get_category_emoji(cat)
+                    field_title = f"{emoji} {cat.replace('_', ' ').title()} Commands"
+                    cmd_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}" for cmd in cmds])
+                    embed.add_field(name=field_title, value=cmd_text, inline=False)
             else:
-                # Just show the commands from the selected category
-                commands_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}"
-                                         for cmd in page_commands])
+                commands_text = "\n".join([f"`{config.PREFIX}{cmd['name']}` - {cmd['description']}" for cmd in page_commands])
                 embed.description = commands_text
         
         # Add pagination info to footer

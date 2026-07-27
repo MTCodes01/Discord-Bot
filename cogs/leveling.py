@@ -161,7 +161,7 @@ class Leveling(commands.Cog):
     
     # === Rank Commands ===
     
-    @command_help("general", "View your rank and level information", "rank [member]")
+    @command_help("leveling", "View your rank and level information", "rank [member]")
     @commands.hybrid_command(name="rank", description="View your rank and level")
     @commands.guild_only()
     async def rank(self, ctx, member: Optional[discord.Member] = None):
@@ -222,7 +222,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error showing rank: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to show rank information.")
     
-    @command_help("general", "View the server XP leaderboard", "leaderboard [page] [afk]")
+    @command_help("leveling", "View the server XP leaderboard", "leaderboard [page] [afk]")
     @commands.hybrid_command(name="leaderboard", aliases=["lb"], description="View the server leaderboard")
     @app_commands.describe(
         page="Page number to view (default: 1)",
@@ -345,7 +345,7 @@ class Leveling(commands.Cog):
     
     # === Admin Commands ===
     
-    @command_help("mod", "Configure the leveling system", "levelconfig")
+    @command_help("leveling"), "Configure the leveling system", "levelconfig")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_group(name="levelconfig", fallback="show", description="Configure the leveling system")
@@ -436,7 +436,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error showing level config: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to show the configuration.")
     
-    @command_help("mod", "Enable or disable level rewards", "levelconfig rewards <enabled>")
+    @command_help("leveling"), "Enable or disable level rewards", "levelconfig rewards <enabled>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="rewards", description="Enable or disable level rewards")
@@ -464,7 +464,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error configuring rewards: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
     
-    @command_help("mod", "Add a role reward for a specific level", "levelconfig addrole <level> <role>")
+    @command_help("leveling"), "Add a role reward for a specific level", "levelconfig addrole <level> <role>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="addrole", description="Add a role reward for a level")
@@ -500,7 +500,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error adding role reward: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to add the role reward.")
     
-    @command_help("mod", "Remove a role reward from a level", "levelconfig removerole <level>")
+    @command_help("leveling"), "Remove a role reward from a level", "levelconfig removerole <level>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="removerole", description="Remove a role reward for a level")
@@ -537,7 +537,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error removing role reward: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to remove the role reward.")
     
-    @command_help("mod", "Configure whether level roles stack or replace previous ones", "levelconfig stackroles <stack>")
+    @command_help("leveling"), "Configure whether level roles stack or replace previous ones", "levelconfig stackroles <stack>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="stackroles", description="Configure whether level roles stack or replace previous ones")
@@ -567,7 +567,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error configuring role stacking: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
     
-    @command_help("mod", "Enable or disable level up messages", "levelconfig messages <enabled>")
+    @command_help("leveling"), "Enable or disable level up messages", "levelconfig messages <enabled>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="messages", description="Enable or disable level up messages")
@@ -595,7 +595,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error configuring level up messages: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
     
-    @command_help("mod", "Set a channel for level up messages", "levelconfig messagechannel [channel]")
+    @command_help("leveling"), "Set a channel for level up messages", "levelconfig messagechannel [channel]")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="messagechannel", description="Set a channel for level up messages")
@@ -640,7 +640,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error setting message channel: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
     
-    @command_help("mod", "Enable or disable sending level up messages via DM", "levelconfig dm <enabled>")
+    @command_help("leveling"), "Enable or disable sending level up messages via DM", "levelconfig dm <enabled>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="dm", description="Enable or disable sending level up messages via DM")
@@ -668,7 +668,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error configuring level up DMs: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
 
-    @command_help("mod", "Configure text XP settings", "levelconfig textxp [min_xp] [max_xp] [cooldown]")
+    @command_help("leveling"), "Configure text XP settings", "levelconfig textxp [min_xp] [max_xp] [cooldown]")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="textxp", description="Configure text XP settings")
@@ -721,7 +721,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error configuring text XP: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
     
-    @command_help("mod", "Configure voice XP settings", "levelconfig voicexp [per_minute] [afk_multiplier] [solo_multiplier]")
+    @command_help("leveling"), "Configure voice XP settings", "levelconfig voicexp [per_minute] [afk_multiplier] [solo_multiplier]")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="voicexp", description="Configure voice XP settings")
@@ -771,7 +771,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error configuring voice XP: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
     
-    @command_help("mod", "Configure level curve settings", "levelconfig curve [base] [exponent]")
+    @command_help("leveling"), "Configure level curve settings", "levelconfig curve [base] [exponent]")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="curve", description="Configure level curve settings")
@@ -824,7 +824,7 @@ class Leveling(commands.Cog):
             self.logger.error(f"Error configuring level curve: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to update the configuration.")
     
-    @command_help("mod", "Reset a user's XP to 0", "levelconfig resetuser <member>")
+    @command_help("leveling"), "Reset a user's XP to 0", "levelconfig resetuser <member>")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @levelconfig.command(name="resetuser", description="Reset a user's XP to 0")

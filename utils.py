@@ -24,15 +24,13 @@ def mod_only():
 # Help formatting utilities
 class HelpInfo:
     """Class to store and manage command help information."""
-    _commands = {
-        "owner": [],
-        "mod": [],
-        "general": []
-    }
+    _commands = {}
     
     @classmethod
     def add_command(cls, category, name, description, usage=None, examples=None, note=None):
         """Register a command's help information."""
+        if category not in cls._commands:
+            cls._commands[category] = []
         cls._commands[category].append({
             "name": name,
             "description": description,

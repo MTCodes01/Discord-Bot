@@ -827,7 +827,7 @@ class Quiz(commands.Cog):
     
     # === User Registration ===
     
-    @command_help("general", "Register for a quiz", "register <quiz_name>")
+    @command_help("quiz", "Register for a quiz", "register <quiz_name>")
     @commands.hybrid_command(name="register", description="Register for a quiz")
     @commands.guild_only()
     async def register_quiz(self, ctx, quiz_name: str):
@@ -874,7 +874,7 @@ class Quiz(commands.Cog):
     
     # === Quiz Master Commands ===
 
-    @command_help("mod", "Send quiz registration embed to a channel", "give <channel> <quiz_name>")
+    @command_help("quiz"), "Send quiz registration embed to a channel", "give <channel> <quiz_name>")
     @commands.hybrid_command(name="give", description="Send quiz registration embed to specified channel")
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)  # Adjust permissions as needed
@@ -928,7 +928,7 @@ class Quiz(commands.Cog):
             self.logger.error(f"Error sending quiz embed: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while sending the quiz registration embed.")
             
-    @command_help("mod", "Create a new quiz", "quiz <name> <rounds: optional = 5>")
+    @command_help("quiz"), "Create a new quiz", "quiz <name> <rounds: optional = 5>")
     @mod_only()
     @commands.hybrid_command(name="quiz", description="Create a new quiz")
     @commands.guild_only()
@@ -1171,7 +1171,7 @@ class Quiz(commands.Cog):
                     pass
             await ctx.send("❌ An error occurred while trying to create the quiz.")
 
-    @command_help("mod", "Add a round to a quiz", "add_round <quiz> <name>")
+    @command_help("quiz"), "Add a round to a quiz", "add_round <quiz> <name>")
     @mod_only()
     @commands.hybrid_command(name="add_round", description="Add a round to a quiz")
     @commands.guild_only()
@@ -1206,7 +1206,7 @@ class Quiz(commands.Cog):
             self.logger.error(f"Error adding round: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to add the round.")
     
-    @command_help("mod", "Add a question to a quiz round", "add_question <quiz> <round> <question> <options> <correct_index> [points]")
+    @command_help("quiz"), "Add a question to a quiz round", "add_question <quiz> <round> <question> <options> <correct_index> [points]")
     @mod_only()
     @commands.hybrid_command(name="add_question", description="Add a question to a quiz round")
     @commands.guild_only()
@@ -1292,7 +1292,7 @@ class Quiz(commands.Cog):
             self.logger.error(f"Error adding question: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to add the question.")
     
-    @command_help("mod", "Start a quiz", "start_quiz <quiz> [round]")
+    @command_help("quiz"), "Start a quiz", "start_quiz <quiz> [round]")
     @mod_only()
     @commands.hybrid_command(name="start_quiz", description="Start a quiz")
     @commands.guild_only()
@@ -1400,7 +1400,7 @@ class Quiz(commands.Cog):
             self.logger.error(f"Error starting quiz: {str(e)}\n{traceback.format_exc()}")
             await ctx.send("❌ An error occurred while trying to start the quiz.")
     
-    @command_help("mod", "Stop a running quiz", "stop_quiz <quiz>")
+    @command_help("quiz"), "Stop a running quiz", "stop_quiz <quiz>")
     @mod_only()
     @commands.hybrid_command(name="stop_quiz", description="Stop a running quiz")
     @commands.guild_only()
@@ -1432,7 +1432,7 @@ class Quiz(commands.Cog):
     
     # === User Commands ===
     
-    @command_help("general", "View your rank in a quiz", "myrank <quiz>")
+    @command_help("quiz", "View your rank in a quiz", "myrank <quiz>")
     @commands.hybrid_command(name="myrank", description="View your rank in a quiz")
     @commands.guild_only()
     async def myrank(self, ctx, quiz: str):

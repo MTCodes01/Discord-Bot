@@ -406,7 +406,7 @@ class ServerLogging(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_command(name="setup_logging", description="Set up logging channels")
-    @command_help("mod", "Set up logging channels for the server", "setup_logging")
+    @command_help("logging", "Set up logging channels for the server", "setup_logging")
     async def setup_logging(self, ctx):
         """Set up logging channels for the server"""
         await ctx.defer()
@@ -459,7 +459,7 @@ class ServerLogging(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_command(name="disable_logging", description="Disable logging system")
-    @command_help("mod", "Disable the logging system", "disable_logging")
+    @command_help("logging", "Disable the logging system", "disable_logging")
     async def disable_logging(self, ctx):
         """Disable logging system"""
         await ctx.defer()
@@ -486,7 +486,7 @@ class ServerLogging(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.hybrid_command(name="logging_status", description="Show logging system status")
-    @command_help("mod", "Show the current logging system status", "logging_status")
+    @command_help("logging", "Show the current logging system status", "logging_status")
     async def logging_status(self, ctx):
         """Show logging system status"""
         await ctx.defer()
