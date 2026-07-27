@@ -96,13 +96,22 @@ class ProfanityDetector:
                 continue
 
             for bad_word in all_bad_words:
+                # Skip fuzzy matching for short bad words to prevent false positives
+                if len(bad_word) <= 3:
+                    continue
+
                 # Only compare words of similar length to prevent excessive CPU usage and false positives
-                if abs(len(collapsed_word) - len(bad_word)) <= 2:
+                max_len_diff = 1 if len(bad_word) <= 4 else 2
+                if abs(len(collapsed_word) - len(bad_word)) <= max_len_diff:
                     score = fuzz.ratio(collapsed_word, bad_word)
                     
-                    if score >= 85:
+                    # Higher thresholds based on length to prevent false positives
+                    min_close = 95 if len(bad_word) <= 5 else 90
+                    min_suspicious = 85 if len(bad_word) <= 5 else 80
+
+                    if score >= min_close:
                         update_best(self.config.CONFIDENCE_CLOSE_VARIATION, bad_word, "Fuzzy Match (Close)")
-                    elif score >= 70:
+                    elif score >= min_suspicious:
                         update_best(self.config.CONFIDENCE_SUSPICIOUS, bad_word, "Fuzzy Match (Suspicious)")
 
         is_profane = best_confidence >= self.config.CONFIDENCE_SUSPICIOUS

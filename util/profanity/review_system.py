@@ -9,8 +9,9 @@ class ReviewView(discord.ui.View):
 
     @discord.ui.button(label="Approve (Safe)", style=discord.ButtonStyle.green, custom_id="profanity_approve")
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # When approved, we could optionally add to whitelist, but for now just log it
-        await interaction.response.send_message("Message marked as safe. The detector will learn from this in the future.", ephemeral=True)
+        # We don't automatically whitelist the bad word to avoid allowing actual profanity,
+        # but the auto-mod thresholds have been improved.
+        await interaction.response.send_message("Message marked as safe. (False positive recorded)", ephemeral=True)
         
         # Update the embed to show it was approved
         embed = interaction.message.embeds[0]
@@ -30,20 +31,27 @@ class ReviewView(discord.ui.View):
         msg_id_str = ""
         for field in embed.fields:
             if field.name == "Channel":
-                channel_id_str = field.value.strip("<#>")
+                channel_id_str = "".join(filter(str.isdigit, field.value))
             elif field.name == "Message ID":
-                msg_id_str = field.value
+                msg_id_str = "".join(filter(str.isdigit, field.value))
 
         delete_status = "Original message could not be found."
         if channel_id_str and msg_id_str:
             try:
                 channel = interaction.guild.get_channel(int(channel_id_str))
+                if not channel:
+                    channel = await interaction.guild.fetch_channel(int(channel_id_str))
+                
                 if channel:
                     msg = await channel.fetch_message(int(msg_id_str))
                     await msg.delete()
                     delete_status = "Message deleted."
-            except Exception:
-                delete_status = "Could not delete message (already deleted or missing permissions)."
+            except discord.NotFound:
+                delete_status = "Message was already deleted."
+            except discord.Forbidden:
+                delete_status = "Missing permissions to delete message."
+            except Exception as e:
+                delete_status = f"Could not delete message: {e}"
 
         await interaction.response.send_message(f"Message rejected. {delete_status}", ephemeral=True)
         

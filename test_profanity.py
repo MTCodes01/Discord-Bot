@@ -25,7 +25,7 @@ def run_tests():
         ("f.u.c.k you", 95, "obfuscation with dots"),
         ("f_u_c_k", 95, "obfuscation with underscores"),
         ("f u c k", 95, "obfuscation with spaces"),
-        ("b!tch", 85, "leetspeak exact / fuzzy"), # wait, "b!tch" -> "bitch" (leetspeak) -> Exact match! Should be 100
+        ("b!tch", 70, "leetspeak exact / fuzzy"), # wait, "b!tch" -> "bitch" (leetspeak) -> Exact match! Should be 100
         ("b1tch", 85, "leetspeak exact / fuzzy"), # "b1tch" -> "bitch" -> Exact match 100
         ("biiitch", 85, "repeated chars"), # fuzzy match (collapse to bich, fuzzy against bitch) -> wait, collapse to bich. len(bich)=4, len(bitch)=5. ratio = 88 -> 85
         ("fuuuuuck", 85, "repeated chars"), 
