@@ -73,7 +73,11 @@ def command_help(category, description, usage=None, examples=None, note=None):
         # If this is a command object (like HybridCommand), get its callback
         actual_func = getattr(func, "callback", func)
 
-        cmd_name = getattr(actual_func, "__name__", "unknown")
+        # Parse the actual command name from the usage string if provided
+        if usage:
+            cmd_name = usage.split("<")[0].split("[")[0].strip()
+        else:
+            cmd_name = getattr(actual_func, "__name__", "unknown")
         
         # Check if the function was tagged by our permission decorators
         requires_mod = getattr(actual_func, "__requires_mod__", False)

@@ -58,12 +58,29 @@ class HelpView(discord.ui.View):
         }
         return emojis.get(category, "📁")
 
+    def is_category_allowed(self, category, is_mod, is_owner):
+        """Helper to check if a user can see a specific category"""
+        owner_only_categories = ["owner", "backup"]
+        mod_only_categories = ["mod", "server_management", "moderation", "logging"]
+        
+        if category in owner_only_categories and not is_owner:
+            return False
+        if category in mod_only_categories and not (is_mod or is_owner):
+            return False
+        return True
+
     def create_category_select(self):
         """Create the category selection dropdown"""
         options = [discord.SelectOption(label="All Commands", value="all", emoji="📋", default=True)]
         
+        is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
+        is_owner = self.ctx.author.id == config.OWNER_ID
+
         for category, cmds in self.commands_by_category.items():
             if not cmds:
+                continue
+            
+            if not self.is_category_allowed(category, is_mod, is_owner):
                 continue
 
             label = f"{category.replace('_', ' ').title()} Commands"
@@ -109,12 +126,19 @@ class HelpView(discord.ui.View):
     
     def get_visible_commands(self):
         """Get list of commands visible to the user based on selected category"""
+        is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
+        is_owner = self.ctx.author.id == config.OWNER_ID
+
         if self.current_category == "all":
             visible_commands = []
             for category, cmds in self.commands_by_category.items():
+                if not self.is_category_allowed(category, is_mod, is_owner):
+                    continue
                 visible_commands.extend(cmds)
             return visible_commands
         else:
+            if not self.is_category_allowed(self.current_category, is_mod, is_owner):
+                return []
             return self.commands_by_category.get(self.current_category, [])
     
     def get_embed(self):
@@ -122,8 +146,7 @@ class HelpView(discord.ui.View):
         if self.current_category == "all":
             title = "Bot Commands Help"
         else:
-            emoji = self.get_category_emoji(self.current_category)
-            title = f"{emoji} {self.current_category.replace('_', ' ').title()} Commands"
+            title = f"{self.current_category.replace('_', ' ').title()} Commands Help"
             
         embed = create_embed(title)
         
@@ -172,95 +195,76 @@ class HelpView(discord.ui.View):
     async def interaction_check(self, interaction):
         """Ensure only the user who initiated the help command can use the components"""
         if interaction.user.id != self.ctx.author.id:
-            await interaction.response.send_message("You can't use this menu. Please run your own help command.", ephemeral=True)
+            await interaction.response.send_message("This help menu is not for you! Run the command yourself.", ephemeral=True)
             return False
         return True
 
-
-class Commands(commands.Cog):
-    """Main commands for the bot."""
+class CommandsCog(commands.Cog):
+    """General bot commands"""
     
     def __init__(self, bot):
-        self.bot: commands.Bot = bot
+        self.bot = bot
         self.start_time = datetime.datetime.now(datetime.timezone.utc)
     
-    # Core system commands (owner only)
+    # --- System Commands ---
+    
     @command_help("owner", "Shuts down the bot completely", "shutdown")
     @owner_only()
     @commands.hybrid_command(name="shutdown", description="Shuts down the bot completely")
     async def shutdown(self, ctx):
         """Shut down the bot completely."""
-        await ctx.send("Shutting down... Sayonara!")
-
-        # Safely close HTTP session if it exists
-        if hasattr(self.bot, "session"):
-            await self.bot.session.close()
-            
+        await ctx.send("Shutting down... Goodbye! 👋")
         await self.bot.close()
         
-    @commands.hybrid_command(name="reboot", description="Reloads all cogs to update code")
-    @owner_only()
     @command_help("owner", "Reloads all cogs to update code", "reboot")
+    @owner_only()
+    @commands.hybrid_command(name="reboot", aliases=["reload"], description="Reloads all cogs to update code")
     async def reboot(self, ctx):
-        """Reload all cogs to implement code changes."""
-        from utils import HelpInfo
-        HelpInfo._commands = {"owner": [], "mod": [], "general": []}  # Clear all help data
-
-        message: discord.Message = await ctx.send("Rebooting cogs...")
-        extensions = list(self.bot.extensions)
-
-        for extension in extensions:
-            try:
-                await self.bot.unload_extension(extension)
-            except Exception as e:
-                await message.edit(content=f"Error unloading {extension}: {e}")
-                return
-
-        for extension in extensions:
-            try:
-                await self.bot.load_extension(extension)
-            except Exception as e:
-                await message.edit(content=f"Error loading {extension}: {e}")
-                return
-
-        await message.edit(content="✅ All cogs have been reloaded successfully!")
-
+        """Reload all cogs to apply new code without shutting down the bot completely."""
+        await ctx.send("🔄 Reloading all cogs...")
+        success = 0
+        failed = 0
+        
+        for file in os.listdir("./cogs"):
+            if file.endswith(".py") and not file.startswith("__"):
+                cog_name = f"cogs.{file[:-3]}"
+                try:
+                    await self.bot.reload_extension(cog_name)
+                    success += 1
+                except Exception as e:
+                    failed += 1
+                    await ctx.send(f"❌ Failed to reload `{cog_name}`: {e}")
+        
+        await ctx.send(f"✅ Reboot complete! Successfully reloaded {success} cogs." + (f" Failed to reload {failed} cogs." if failed > 0 else ""))
+        
     @command_help("owner", "Syncs application commands (slash commands)", "sync [scope]")
     @owner_only()
-    @commands.hybrid_command(name="sync", description="Syncs application commands (slash commands)")
-    async def sync(self, ctx, scope: str = None):
-        """Sync application commands (slash commands).
-        
-        Scope 'guild' syncs global commands to the current server (immediate).
-        Scope 'clear' removes server-specific commands to fix duplicates.
-        No scope syncs globally (takes up to an hour).
+    @commands.hybrid_command(name="sync", description="Syncs application commands to Discord")
+    async def sync(self, ctx, scope: str = "global"):
+        """Sync application commands to Discord.
+        Scope can be 'global' or 'guild' (current guild only).
         """
-        await ctx.defer(ephemeral=True)
+        await ctx.defer()
+        
         try:
-            if scope == "guild" or scope == "local":
+            if scope.lower() == "guild" and ctx.guild:
                 self.bot.tree.copy_global_to(guild=ctx.guild)
                 synced = await self.bot.tree.sync(guild=ctx.guild)
-                await ctx.send(f"Synced {len(synced)} application commands to **this guild**.", ephemeral=True)
-            elif scope == "clear":
-                self.bot.tree.clear_commands(guild=ctx.guild)
-                await self.bot.tree.sync(guild=ctx.guild)
-                await ctx.send("Cleared all guild-specific application commands to fix duplicates.", ephemeral=True)
+                await ctx.send(f"✅ Synced {len(synced)} command(s) to this guild.")
             else:
                 synced = await self.bot.tree.sync()
-                await ctx.send(f"Synced {len(synced)} application commands **globally**.", ephemeral=True)
+                await ctx.send(f"✅ Synced {len(synced)} command(s) globally.")
         except Exception as e:
-            await ctx.send(f"Failed to sync application commands: {e}", ephemeral=True)
-
-    
+            await ctx.send(f"❌ Failed to sync commands: {e}")
+            
     @command_help("owner", "Set the bot's status", "status [status]")
     @owner_only()
-    @commands.hybrid_command(name="status", description="Set the bot's status")
-    async def status(self, ctx, *, status: str):
-        """Set the bot's status."""
-        await self.bot.change_presence(activity=discord.Game(name=status))
-        await ctx.send(f"Bot status set to: {status}")
-        await ctx.send("Bot status has been updated successfully!")
-
+    @commands.hybrid_command(name="status", description="Set the bot's status message")
+    async def status(self, ctx, *, status_msg: str):
+        """Change the bot's status (playing) message."""
+        await self.bot.change_presence(activity=discord.Game(name=status_msg))
+        await ctx.send(f"✅ Status updated to: `{status_msg}`")
+        
     @command_help(
         category="owner",
         description="Lists all available cogs in the cogs folder",
@@ -304,10 +308,12 @@ class Commands(commands.Cog):
             for cat, cmds in commands_by_category.items():
                 visible_cmds = []
                 for cmd in cmds:
-                    bot_cmd = self.bot.get_command(cmd["name"].split()[0])
+                    bot_cmd = self.bot.get_command(cmd["name"])
+
                     if not bot_cmd:
-                        # Fallback if command not found
-                        visible_cmds.append(cmd)
+                        # Only show if not explicitly mod/owner
+                        if cat not in ["owner", "backup", "mod", "server_management", "moderation", "logging"]:
+                            visible_cmds.append(cmd)
                         continue
                     
                     try:
@@ -326,14 +332,14 @@ class Commands(commands.Cog):
             await ctx.send(embed=view.get_embed(), view=view)
     
     # Example commands
-    @command_help("mod", "Example command for moderators", "mod_command")
+    @command_help("mod", "Example command for moderators", "mod")
     @mod_only()
     @commands.hybrid_command(name="mod", description="Example command for demonstration of mod-only access")
     async def mod_command(self, ctx):
         """Example moderator command."""
         await ctx.send("This is a moderator-only command!")
     
-    @command_help("owner", "Example command for bot owners", "owner_command")
+    @command_help("owner", "Example command for bot owners", "owner")
     @owner_only()
     @commands.hybrid_command(name="owner", description="Example command for demonstration of owner-only access")
     async def owner_command(self, ctx):
@@ -522,5 +528,4 @@ class Commands(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(Commands(bot))
-
+    await bot.add_cog(CommandsCog(bot))
