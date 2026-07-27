@@ -79,8 +79,8 @@ class ProfanityDetector:
         for bad_word in all_bad_words:
             if bad_word in compressed_text:
                 # To be safe against very short bad words matching random letter combinations,
-                # we only trigger obfuscation for words >= 3 chars.
-                if len(bad_word) >= 3:
+                # we only trigger obfuscation for words >= 4 chars.
+                if len(bad_word) >= 4:
                     update_best(self.config.CONFIDENCE_OBFUSCATION, bad_word, "Obfuscation")
 
         if best_confidence >= self.config.CONFIDENCE_OBFUSCATION:
