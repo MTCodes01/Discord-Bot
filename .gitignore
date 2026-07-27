@@ -21,3 +21,4 @@ leveling/
 *.db
 *.sqlite3
 *.sqlite
+.env

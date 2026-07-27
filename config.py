@@ -1,43 +1,75 @@
-# Bot configuration
+import os
+from pathlib import Path
+
+# The default configuration values (used to auto-generate the .env file)
+DEFAULT_CONFIG = {
+    "DISCORD_TOKEN": "YOUR_BOT_TOKEN_HERE",
+    "PREFIX": "!",
+    "OWNER_ID": "YOUR_DISCORD_USER_ID_HERE",
+    "MOD_ROLES": "MOD_ROLE_ID_1,MOD_ROLE_ID_2",
+    "BOT_STATUS": "In Progress...",
+    "EMBED_COLOR": "0x3498db",
+    "BAD_WORDS": [
+        "badword1",
+        "badword2",
+        "badword3"
+    ]
+}
+
+# Auto-generate .env if it doesn't exist
+env_path = Path(".env")
+if not env_path.exists():
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.write("# Discord Bot Configuration\n")
+        f.write("# Update these values to configure your bot\n\n")
+        for key, value in DEFAULT_CONFIG.items():
+            if isinstance(value, list):
+                value = ",".join(value)
+            f.write(f"{key}={value}\n")
+
+# Load variables from .env natively
+with open(env_path, "r", encoding="utf-8") as f:
+    for line in f:
+        line = line.strip()
+        if line and not line.startswith("#"):
+            if "=" in line:
+                key, val = line.split("=", 1)
+                os.environ[key.strip()] = val.strip().strip("'\"")
+
+# ---------------------------------------------------------
+# Exported Configuration Variables
+# ---------------------------------------------------------
 
 # Bot token (keep this private!)
-TOKEN = "_xE1iGT-uRBH4MQnZOmAZW8tLKpCKd6eIt4gLj0QmG24BMPgIo00A2IIuiA7cEB5"
+TOKEN = os.environ.get("DISCORD_TOKEN", DEFAULT_CONFIG["DISCORD_TOKEN"])
 
 # Command prefix
-PREFIX = ">" # Change this to your desired prefix
+PREFIX = os.environ.get("PREFIX", DEFAULT_CONFIG["PREFIX"])
 
 # Bot owner ID (this is your Discord user ID)
-OWNER_ID = 863835017000386630  # Replace with your actual Discord user ID
+try:
+    OWNER_ID = int(os.environ.get("OWNER_ID", DEFAULT_CONFIG["OWNER_ID"]))
+except ValueError:
+    OWNER_ID = 0  # Fallback if it's still the placeholder
 
 # List of moderator role IDs
-MOD_ROLES = [
-    1367489815800713347,
-    1396006457576783964
-]
+mod_roles_str = os.environ.get("MOD_ROLES", DEFAULT_CONFIG["MOD_ROLES"])
+MOD_ROLES = []
+for r in mod_roles_str.split(","):
+    r = r.strip()
+    if r:
+        try:
+            MOD_ROLES.append(int(r))
+        except ValueError:
+            pass # Skip placeholders
 
 # Bot status
-BOT_STATUS = "In Progress..."
+BOT_STATUS = os.environ.get("BOT_STATUS", DEFAULT_CONFIG["BOT_STATUS"])
 
 # Color for embeds (in hex)
-EMBED_COLOR = 0x3498db  # Blue color
+embed_color_str = os.environ.get("EMBED_COLOR", DEFAULT_CONFIG["EMBED_COLOR"])
+EMBED_COLOR = int(embed_color_str, 16) if embed_color_str.startswith("0x") else int(embed_color_str)
 
 # AutoMod Bad Words List
-BAD_WORDS = ["absurd", "af", "annoying", "arse", "arsehole", "ass", "asshole", "asshat", "asswipe", 
-             "backside", "ballbag", "bastard", "bastards", "bellend", "bitch", "bitches", "bitchy", 
-             "blowjob", "bollock", "bollocks", "bollox", "boner", "boob", "boobs", "brainless", 
-             "bs", "buffoon", "bullshit", "clint", "clueless", "clown", "cock", "cockhead", 
-             "cocksucker", "coward", "crap", "creep", "creepy", "cringe", "cringey", "cum", 
-             "cunt", "damn", "dick", "dickhead", "dickweed", "dimwit", "dipshit", "disaster", 
-             "disgusting", "douche", "douchebag", "drop dead", "dumbass", "dunce", "fake", 
-             "fanny", "feck", "freak", "fuck", "fucker", "fuckface", "fuckhead", "fucking", 
-             "fucktard", "garbage", "garbagey", "get lost", "gross", "gtfo", "hell", "hideous", 
-             "idiot", "ignorant", "imbecile", "irritating", "jackass", "jackoff", "jerk", 
-             "jizz", "knob", "knobhead", "lame", "lazy", "loser", "mess", "mindless", "moron", 
-             "motherfucker", "motherfucking", "noob", "nonsense", "nub", "numbnut", "obnoxious", 
-             "pathetic", "phony", "piss", "pissed", "porn", "prick", "pussy", "quim", "ridiculous", 
-             "rubbish", "scrotum", "screw you", "screw u", "scrub", "semen", "sex", "shag", 
-             "shat", "shit", "shithead", "shiting", "shitty", "shiz", "shut up", "skank", 
-             "slut", "smegma", "spastic", "spineless", "stfu", "stupid", "suck", "sucks", 
-             "sucky", "tit", "tits", "tosser", "trainwreck", "trash", "trashy", "tryhard", 
-             "twat", "ugly", "useless", "vagina", "wank", "wanker", "weirdo", "whore", 
-             "worthless", "wtf"]
+bad_words_str = os.environ.get("BAD_WORDS", ",".join(DEFAULT_CONFIG["BAD_WORDS"]))
+BAD_WORDS = [w.strip() for w in bad_words_str.split(",") if w.strip()]
