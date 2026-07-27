@@ -58,6 +58,17 @@ class HelpView(discord.ui.View):
         }
         return emojis.get(category, "📁")
 
+    def is_category_allowed(self, category, is_mod, is_owner):
+        """Helper to check if a user can see a specific category"""
+        owner_only_categories = ["owner", "backup"]
+        mod_only_categories = ["mod", "server_management", "moderation", "logging"]
+        
+        if category in owner_only_categories and not is_owner:
+            return False
+        if category in mod_only_categories and not (is_mod or is_owner):
+            return False
+        return True
+
     def create_category_select(self):
         """Create the category selection dropdown"""
         options = [discord.SelectOption(label="All Commands", value="all", emoji="📋", default=True)]
@@ -69,10 +80,7 @@ class HelpView(discord.ui.View):
             if not cmds:
                 continue
             
-            if category == "owner" and not is_owner:
-                continue
-                
-            if category == "mod" and not (is_mod or is_owner):
+            if not self.is_category_allowed(category, is_mod, is_owner):
                 continue
 
             label = f"{category.replace('_', ' ').title()} Commands"
@@ -124,17 +132,13 @@ class HelpView(discord.ui.View):
         if self.current_category == "all":
             visible_commands = []
             for category, cmds in self.commands_by_category.items():
-                if category == "owner" and not is_owner:
-                    continue
-                if category == "mod" and not (is_mod or is_owner):
+                if not self.is_category_allowed(category, is_mod, is_owner):
                     continue
                 visible_commands.extend(cmds)
             return visible_commands
         else:
             category = self.current_category
-            if category == "owner" and not is_owner:
-                return []
-            if category == "mod" and not (is_mod or is_owner):
+            if not self.is_category_allowed(category, is_mod, is_owner):
                 return []
             return self.commands_by_category.get(category, [])
     
