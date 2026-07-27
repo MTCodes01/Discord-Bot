@@ -71,7 +71,7 @@ class HelpView(discord.ui.View):
 
     def create_category_select(self):
         """Create the category selection dropdown"""
-        options = [discord.SelectOption(label="All Commands", value="all", emoji="📋", default=True)]
+        options = [discord.SelectOption(label="All Commands", value="all", emoji="📋", default=(self.current_category == "all"))]
         
         is_mod = any(role.id in config.MOD_ROLES for role in self.ctx.author.roles) if self.ctx.guild else False
         is_owner = self.ctx.author.id == config.OWNER_ID
@@ -85,7 +85,7 @@ class HelpView(discord.ui.View):
 
             label = f"{category.replace('_', ' ').title()} Commands"
             emoji = self.get_category_emoji(category)
-            options.append(discord.SelectOption(label=label, value=category, emoji=emoji))
+            options.append(discord.SelectOption(label=label, value=category, emoji=emoji, default=(self.current_category == category)))
             
         # Discord allows max 25 options
         options = options[:25]
@@ -117,6 +117,11 @@ class HelpView(discord.ui.View):
         """Update the view and embed"""
         self.previous_button.disabled = (self.current_page == 0)
         self.next_button.disabled = (self.current_page >= self.get_total_pages() - 1)
+        
+        # Update the select dropdown to show the current category as default
+        for option in self.category_select.options:
+            option.default = (option.value == self.current_category)
+            
         await interaction.response.edit_message(embed=self.get_embed(), view=self)
     
     def get_total_pages(self):
